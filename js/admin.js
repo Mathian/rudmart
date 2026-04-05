@@ -83,6 +83,19 @@ window.addEventListener('DOMContentLoaded', async () => {
   showLoading();
   initFirebase();
 
+  // Bootstrap: create default admin if none exist
+  try {
+    const existing = await dbQuery('admins', [{ type: 'limit', n: 1 }]);
+    if (!existing.length) {
+      await dbSetFull('admins', 'admin', {
+        login: 'admin',
+        password: 'rudmart2024',
+        createdAt: dbServerTimestamp(),
+      });
+      console.log('[Admin] Default admin created: admin / rudmart2024');
+    }
+  } catch (e) { console.warn('[Admin] Bootstrap check failed:', e.message); }
+
   const savedLogin = localStorage.getItem('rm_admin_login');
   if (savedLogin) {
     const admin = await dbGet('admins', savedLogin);
