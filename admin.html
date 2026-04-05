@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>RudMart Admin</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
+<!-- SheetJS for XLSX import -->
+<script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+<link rel="stylesheet" href="css/admin.css">
+</head>
+<body>
+
+<div class="loading-overlay" id="loading-overlay"><div class="spin"></div></div>
+
+<!-- ==================== LOGIN ==================== -->
+<div class="screen active" id="s-login">
+  <div class="login-box">
+    <div class="login-logo">
+      <div class="login-logo-img">
+        <img src="RudMart - 2.png" alt="RudMart" onerror="this.style.display='none'">
+      </div>
+      <h1>RudMart Admin</h1>
+      <p>Панель управления</p>
+    </div>
+    <input class="inp mb10" type="text" id="login-user" placeholder="Логин" autocomplete="username">
+    <input class="inp mb10" type="password" id="login-pass" placeholder="Пароль"
+      autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()">
+    <button class="btn btn-red" onclick="doLogin()">Войти →</button>
+    <div style="font-size:11px;color:var(--text3);text-align:center;margin-top:12px">
+      Доступ только для администраторов
+    </div>
+  </div>
+</div>
+
+<!-- ==================== MAIN APP ==================== -->
+<div class="screen" id="s-main">
+  <div class="main-body">
+
+    <!-- ===== ORDERS TAB ===== -->
+    <div class="tab-pane active" id="tab-orders">
+      <div class="page-hdr">
+        <div class="page-hdr-title">Заказы</div>
+        <div class="page-hdr-actions">
+          <button class="btn btn-ghost btn-sm" onclick="refreshOrders()">↻</button>
+        </div>
+      </div>
+      <!-- Status filter chips -->
+      <div class="orders-filter">
+        <button class="filter-chip active" id="fchip-all"      onclick="setOrderFilter('all')">Все</button>
+        <button class="filter-chip"        id="fchip-new"      onclick="setOrderFilter('new')">Новые</button>
+        <button class="filter-chip"        id="fchip-accepted" onclick="setOrderFilter('accepted')">Принятые</button>
+        <button class="filter-chip"        id="fchip-assembled" onclick="setOrderFilter('assembled')">Собранные</button>
+        <button class="filter-chip"        id="fchip-sent"     onclick="setOrderFilter('sent')">Отправленные</button>
+        <button class="filter-chip"        id="fchip-done"     onclick="setOrderFilter('done')">Выполненные</button>
+      </div>
+      <div class="orders-list" id="orders-list">
+        <!-- Filled dynamically -->
+      </div>
+    </div>
+
+    <!-- ===== SHOP TAB ===== -->
+    <div class="tab-pane" id="tab-shop">
+      <div class="page-hdr">
+        <div class="page-hdr-title">Товары</div>
+        <div class="page-hdr-actions">
+          <button class="btn btn-sm btn-outline" onclick="openImport()">📥 Импорт</button>
+        </div>
+      </div>
+      <!-- Search + category filter -->
+      <div class="shop-search-bar">
+        <div class="shop-search-inp-wrap">
+          <span class="shop-search-ico">🔍</span>
+          <input class="shop-search-inp" id="admin-search-inp" type="text"
+            placeholder="Поиск товаров..." oninput="onAdminSearch(this.value)">
+        </div>
+      </div>
+      <div class="shop-cat-filter" id="admin-cat-filter">
+        <!-- filled dynamically -->
+      </div>
+      <div class="admin-prod-grid" id="admin-prod-grid">
+        <!-- products -->
+      </div>
+      <div class="load-more-btn" id="admin-load-more" style="display:none">
+        <button class="btn btn-ghost btn-sm" onclick="loadMoreAdminProducts()">Загрузить ещё</button>
+      </div>
+    </div>
+
+    <!-- ===== SETTINGS TAB ===== -->
+    <div class="tab-pane" id="tab-settings">
+      <div class="page-hdr">
+        <div class="page-hdr-title">Настройки</div>
+      </div>
+      <div class="settings-section">
+
+        <!-- Import / export -->
+        <div class="section-title">База товаров</div>
+        <div class="settings-card">
+          <div class="settings-row" onclick="openImport()">
+            <span class="settings-row-ico">📥</span>
+            <div class="settings-row-info">
+              <div class="settings-row-title">Импорт из XLSX</div>
+              <div class="settings-row-sub">Загрузить/обновить товары из Excel</div>
+            </div>
+            <span class="settings-row-arrow">→</span>
+          </div>
+          <div class="settings-row" onclick="exportProducts()">
+            <span class="settings-row-ico">📤</span>
+            <div class="settings-row-info">
+              <div class="settings-row-title">Экспорт товаров</div>
+              <div class="settings-row-sub">Скачать базу товаров в XLSX</div>
+            </div>
+            <span class="settings-row-arrow">→</span>
+          </div>
+        </div>
+
+        <!-- Banners -->
+        <div class="section-title">Баннеры</div>
+        <div class="settings-card">
+          <div class="settings-row" onclick="openBannerEditor()">
+            <span class="settings-row-ico">🖼</span>
+            <div class="settings-row-info">
+              <div class="settings-row-title">Управление баннерами</div>
+              <div class="settings-row-sub">Добавить, удалить, вкл/выкл баннеры</div>
+            </div>
+            <span class="settings-row-arrow">→</span>
+          </div>
+        </div>
+
+        <!-- App settings -->
+        <div class="section-title">Параметры магазина</div>
+        <div class="settings-card" style="padding:14px">
+          <div class="inp-wrap">
+            <div class="inp-label">Стоимость доставки (₸)</div>
+            <input class="inp" id="set-delivery" type="number" placeholder="500">
+          </div>
+          <div class="inp-wrap">
+            <div class="inp-label">Ссылка на публичную оферту</div>
+            <input class="inp" id="set-offer-url" type="url" placeholder="https://...">
+          </div>
+          <button class="btn btn-red btn-sm" onclick="saveAppSettings()">Сохранить настройки</button>
+        </div>
+
+        <!-- Admin management -->
+        <div class="section-title">Администраторы</div>
+        <div class="settings-card" style="padding:14px">
+          <div class="inp-wrap">
+            <div class="inp-label">Логин</div>
+            <input class="inp" id="new-admin-login" type="text" placeholder="admin2">
+          </div>
+          <div class="inp-wrap">
+            <div class="inp-label">Пароль</div>
+            <input class="inp" id="new-admin-pass" type="password" placeholder="••••••">
+          </div>
+          <button class="btn btn-outline btn-sm" onclick="addAdmin()">Добавить администратора</button>
+        </div>
+
+        <div style="padding:20px 0;text-align:center">
+          <button class="btn btn-ghost btn-sm" onclick="doLogout()">← Выйти</button>
+        </div>
+
+      </div>
+    </div>
+
+  </div><!-- /main-body -->
+
+  <!-- Bottom navigation -->
+  <div class="bnav">
+    <button class="ni on" id="ni-orders" onclick="switchTab('orders')">
+      <span class="ni-ico">📋</span>
+      <span class="ni-lbl">Заказы</span>
+      <span class="ni-badge hidden" id="orders-badge">0</span>
+    </button>
+    <button class="ni" id="ni-shop" onclick="switchTab('shop')">
+      <span class="ni-ico">🛍</span>
+      <span class="ni-lbl">Магазин</span>
+    </button>
+    <button class="ni" id="ni-settings" onclick="switchTab('settings')">
+      <span class="ni-ico">⚙️</span>
+      <span class="ni-lbl">Настройки</span>
+    </button>
+  </div>
+</div><!-- /s-main -->
+
+<!-- ==================== ORDER DETAIL MODAL ==================== -->
+<div class="modal-overlay" id="overlay-order" onclick="closeOrderDetail()"></div>
+<div class="modal-sheet" id="modal-order">
+  <div class="modal-drag"></div>
+  <div class="order-detail-hdr">
+    <button class="order-detail-back" onclick="closeOrderDetail()">←</button>
+    <div style="flex:1">
+      <div style="font-size:16px;font-weight:800" id="od-title">Заказ</div>
+      <div style="font-size:12px;color:var(--text2)" id="od-time"></div>
+    </div>
+    <div id="od-status-badge"></div>
+  </div>
+  <div class="modal-scroll" id="od-body" style="padding:14px">
+    <!-- filled dynamically -->
+  </div>
+  <div class="modal-footer" id="od-footer">
+    <!-- action buttons -->
+  </div>
+</div>
+
+<!-- ==================== PRODUCT EDIT MODAL ==================== -->
+<div class="modal-overlay" id="overlay-prod-edit" onclick="closeProdEdit()"></div>
+<div class="modal-sheet" id="modal-prod-edit">
+  <div class="modal-drag"></div>
+  <div class="prod-edit-hdr">
+    <button class="pe-close" onclick="closeProdEdit()">←</button>
+    <div style="font-size:16px;font-weight:800">Редактировать товар</div>
+  </div>
+  <div class="modal-scroll" style="padding:14px">
+
+    <!-- Photo upload -->
+    <div class="inp-wrap">
+      <div class="inp-label">Фото товара</div>
+      <div class="pe-img-upload" id="pe-img-upload" onclick="document.getElementById('pe-img-file').click()">
+        <div class="pe-img-ico" id="pe-img-ico">📷</div>
+        <div class="pe-img-label" id="pe-img-label">Нажмите для загрузки</div>
+        <img id="pe-img-preview" style="display:none">
+      </div>
+      <input type="file" id="pe-img-file" accept="image/*" style="display:none" onchange="onPeImgSelect(event)">
+    </div>
+
+    <!-- Basic info (readonly from import) -->
+    <div class="inp-wrap">
+      <div class="inp-label">Наименование</div>
+      <input class="inp" id="pe-name" type="text" placeholder="Название товара">
+    </div>
+
+    <div class="inp-wrap">
+      <div class="inp-label">Категория</div>
+      <select class="select" id="pe-category">
+        <option value="">— Выбрать категорию —</option>
+      </select>
+    </div>
+
+    <div style="display:flex;gap:10px">
+      <div class="inp-wrap" style="flex:1">
+        <div class="inp-label">Цена (₸)</div>
+        <input class="inp" id="pe-price" type="number">
+      </div>
+      <div class="inp-wrap" style="flex:1">
+        <div class="inp-label">Цена по КК (₸)</div>
+        <input class="inp" id="pe-club-price" type="number">
+      </div>
+    </div>
+
+    <!-- Toggles -->
+    <div class="card card-body" style="margin-bottom:12px">
+      <div class="toggle-row">
+        <div>
+          <div class="toggle-label">В наличии</div>
+        </div>
+        <div class="toggle-sw" id="pe-available-sw" onclick="togglePeSw('available')"></div>
+      </div>
+      <div class="toggle-row">
+        <div>
+          <div class="toggle-label">Лучшее предложение</div>
+          <div class="toggle-sub">Показывать в «Лучших предложениях»</div>
+        </div>
+        <div class="toggle-sw" id="pe-bestOffer-sw" onclick="togglePeSw('bestOffer')"></div>
+      </div>
+    </div>
+
+    <!-- Characteristics -->
+    <div class="card card-body" style="margin-bottom:12px">
+      <div class="section-title">Характеристики</div>
+      <div class="inp-wrap">
+        <div class="inp-label">Бренд</div>
+        <input class="inp" id="pe-brand" type="text" placeholder="Например: Простоквашино">
+      </div>
+      <div style="display:flex;gap:10px">
+        <div class="inp-wrap" style="flex:1">
+          <div class="inp-label">Объём (л)</div>
+          <input class="inp" id="pe-volume" type="number" step="0.1">
+        </div>
+        <div class="inp-wrap" style="flex:1">
+          <div class="inp-label">Масса (г)</div>
+          <input class="inp" id="pe-weight" type="number">
+        </div>
+      </div>
+      <div style="display:flex;gap:10px">
+        <div class="inp-wrap" style="flex:1">
+          <div class="inp-label">Жирность (%)</div>
+          <input class="inp" id="pe-fat" type="number" step="0.1">
+        </div>
+        <div class="inp-wrap" style="flex:1">
+          <div class="inp-label">Крепость (%)</div>
+          <input class="inp" id="pe-strength" type="number" step="0.1">
+        </div>
+      </div>
+      <div class="inp-wrap">
+        <div class="inp-label">Газированный</div>
+        <select class="select" id="pe-carbonated">
+          <option value="">— Не указано —</option>
+          <option value="true">Да</option>
+          <option value="false">Нет</option>
+        </select>
+      </div>
+      <div style="display:flex;gap:10px">
+        <div class="inp-wrap" style="flex:1">
+          <div class="inp-label">Белки (г)</div>
+          <input class="inp" id="pe-proteins" type="number" step="0.1">
+        </div>
+        <div class="inp-wrap" style="flex:1">
+          <div class="inp-label">Жиры (г)</div>
+          <input class="inp" id="pe-fats" type="number" step="0.1">
+        </div>
+        <div class="inp-wrap" style="flex:1">
+          <div class="inp-label">Углеводы (г)</div>
+          <input class="inp" id="pe-carbs" type="number" step="0.1">
+        </div>
+      </div>
+    </div>
+
+    <button class="btn btn-red" onclick="saveProdEdit()">Сохранить изменения</button>
+    <div style="height:24px"></div>
+  </div>
+</div>
+
+<!-- ==================== IMPORT MODAL ==================== -->
+<div class="modal-overlay" id="overlay-import" onclick="closeImport()"></div>
+<div class="modal-sheet" id="modal-import">
+  <div class="modal-drag"></div>
+  <div class="import-hdr">
+    <button class="pe-close" onclick="closeImport()">←</button>
+    <div style="font-size:16px;font-weight:800">Импорт товаров из XLSX</div>
+  </div>
+  <div class="import-body">
+    <!-- Drop zone -->
+    <div class="import-drop" id="import-drop"
+      onclick="document.getElementById('import-file').click()"
+      ondragover="event.preventDefault();this.classList.add('dragover')"
+      ondragleave="this.classList.remove('dragover')"
+      ondrop="onImportDrop(event)">
+      <div class="import-drop-ico">📊</div>
+      <div class="import-drop-label" id="import-drop-label">Нажмите или перетащите .xlsx файл</div>
+    </div>
+    <input type="file" id="import-file" accept=".xlsx,.xls" style="display:none" onchange="onImportFileSelect(event)">
+
+    <!-- Category for new products -->
+    <div class="inp-wrap mt12">
+      <div class="inp-label">Категория для новых товаров</div>
+      <select class="select" id="import-category">
+        <option value="other">Прочее (по умолчанию)</option>
+      </select>
+    </div>
+
+    <!-- Progress -->
+    <div class="import-progress" id="import-progress">
+      <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--text2)">
+        <span id="import-status-text">Обработка...</span>
+        <span id="import-pct">0%</span>
+      </div>
+      <div class="progress-bar-wrap">
+        <div class="progress-bar" id="import-progress-bar" style="width:0%"></div>
+      </div>
+      <div class="import-log" id="import-log"></div>
+    </div>
+
+    <!-- Actions -->
+    <div style="display:flex;gap:10px;margin-top:16px">
+      <button class="btn btn-red" id="btn-start-import" onclick="startImport()" disabled>
+        Начать импорт
+      </button>
+      <button class="btn btn-ghost btn-sm" style="flex:none;padding:0 18px" onclick="closeImport()">Отмена</button>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== BANNER EDITOR MODAL ==================== -->
+<div class="modal-overlay" id="overlay-banners" onclick="closeBannerEditor()"></div>
+<div class="modal-sheet" id="modal-banners">
+  <div class="modal-drag"></div>
+  <div class="import-hdr">
+    <button class="pe-close" onclick="closeBannerEditor()">←</button>
+    <div style="font-size:16px;font-weight:800">Баннеры</div>
+    <button class="btn btn-sm btn-red" style="margin-left:auto" onclick="addBanner()">+ Добавить</button>
+  </div>
+  <div class="import-body" id="banners-editor-list">
+    <!-- filled dynamically -->
+  </div>
+</div>
+
+<!-- ==================== ADD BANNER MODAL ==================== -->
+<div class="modal-overlay" id="overlay-add-banner"></div>
+<div class="modal-sheet" id="modal-add-banner">
+  <div class="modal-drag"></div>
+  <div class="import-hdr">
+    <button class="pe-close" onclick="closeAddBanner()">←</button>
+    <div style="font-size:16px;font-weight:800">Новый баннер</div>
+  </div>
+  <div class="import-body">
+    <div class="pe-img-upload" id="banner-img-upload" onclick="document.getElementById('banner-img-file').click()">
+      <div class="pe-img-ico" id="banner-img-ico">🖼</div>
+      <div class="pe-img-label">Нажмите для выбора изображения</div>
+      <img id="banner-img-preview" style="display:none">
+    </div>
+    <input type="file" id="banner-img-file" accept="image/*" style="display:none" onchange="onBannerImgSelect(event)">
+    <div class="inp-wrap mt12">
+      <div class="inp-label">Цвет фона (если нет фото)</div>
+      <input class="inp" id="banner-bg-color" type="color" value="#A60000">
+    </div>
+    <div style="margin-top:8px">
+      <button class="btn btn-red" onclick="saveBanner()">Сохранить баннер</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script src="js/config.js"></script>
+<script src="js/db.js"></script>
+<script src="js/admin.js"></script>
+</body>
+</html>
