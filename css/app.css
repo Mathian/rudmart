@@ -107,7 +107,7 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);
 .toast.show{opacity:1}.toast.hide{opacity:0;transform:translateX(-50%) translateY(20px)}
 
 /* ================= REGISTRATION ================= */
-#s-register{overflow-y:auto;overflow-x:hidden}
+#s-register{overflow:hidden}
 .reg-wrap{min-height:100%;padding:56px 20px 40px;
   background:radial-gradient(ellipse at 50% 0%,rgba(222,17,14,.07) 0%,transparent 55%),var(--bg)}
 .reg-logo{text-align:center;margin-bottom:28px}
@@ -124,7 +124,7 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);
 .field-rel{position:relative}
 
 /* ================= CONSENT ================= */
-#s-consent{overflow-y:auto;overflow-x:hidden}
+#s-consent{overflow:hidden}
 .consent-wrap{min-height:100%;padding:48px 20px 40px;
   background:radial-gradient(ellipse at 50% 0%,rgba(222,17,14,.07) 0%,transparent 55%),var(--bg)}
 .consent-icon{font-size:52px;text-align:center;margin-bottom:16px}

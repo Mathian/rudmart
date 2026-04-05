@@ -32,7 +32,9 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);
 .screen.active{opacity:1;pointer-events:auto}
 
 /* ---- Login screen scrollable on small screens ---- */
-#s-login{overflow-y:auto}
+#s-login{overflow:hidden}
+.login-scroll-wrap{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;
+  display:flex;align-items:center;justify-content:center;padding:20px}
 
 /* ---- Login ---- */
 #s-login{align-items:center;justify-content:center;
