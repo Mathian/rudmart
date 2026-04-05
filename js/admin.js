@@ -32,8 +32,17 @@ const A = {
 const ADMIN_PROD_PAGE = 20;
 
 /* ---- Helpers ---- */
-function showLoading() { document.getElementById('loading-overlay').classList.remove('hidden'); }
-function hideLoading() { document.getElementById('loading-overlay').classList.add('hidden'); }
+function showLoading() {
+  const el = document.getElementById('loading-overlay');
+  el.style.display = '';
+  el.classList.remove('hidden');
+}
+function hideLoading() {
+  const el = document.getElementById('loading-overlay');
+  el.classList.add('hidden');
+  // Force-remove from layout after transition completes
+  setTimeout(() => { el.style.display = 'none'; }, 400);
+}
 
 let toastTimer;
 function showToast(msg, duration = 2500) {
@@ -81,32 +90,49 @@ function fmtDate(ts) {
    ============================================================ */
 window.addEventListener('DOMContentLoaded', async () => {
   showLoading();
-  initFirebase();
 
-  // Bootstrap: create default admin if none exist
+  // Safety net: force-hide overlay after 8s even if Firebase hangs
+  const bootGuard = setTimeout(() => {
+    hideLoading();
+    showScreen('s-login');
+  }, 8000);
+
   try {
-    const existing = await dbQuery('admins', [{ type: 'limit', n: 1 }]);
-    if (!existing.length) {
-      await dbSetFull('admins', 'admin', {
-        login: 'admin',
-        password: 'rudmart2024',
-        createdAt: dbServerTimestamp(),
-      });
-      console.log('[Admin] Default admin created: admin / rudmart2024');
-    }
-  } catch (e) { console.warn('[Admin] Bootstrap check failed:', e.message); }
+    await initFirebase();
 
-  const savedLogin = localStorage.getItem('rm_admin_login');
-  if (savedLogin) {
-    const admin = await dbGet('admins', savedLogin);
-    if (admin) {
-      hideLoading();
-      enterAdmin(admin);
-      return;
+    // Bootstrap: create default admin if none exist
+    try {
+      const existing = await dbQuery('admins', [{ type: 'limit', n: 1 }]);
+      if (!existing.length) {
+        await dbSetFull('admins', 'admin', {
+          login: 'admin',
+          password: 'rudmart2024',
+          createdAt: dbServerTimestamp(),
+        });
+        console.log('[Admin] Default admin created: admin / rudmart2024');
+      }
+    } catch (e) { console.warn('[Admin] Bootstrap check failed:', e.message); }
+
+    const savedLogin = localStorage.getItem('rm_admin_login');
+    if (savedLogin) {
+      const admin = await dbGet('admins', savedLogin);
+      if (admin) {
+        clearTimeout(bootGuard);
+        hideLoading();
+        enterAdmin(admin);
+        return;
+      }
     }
+
+    clearTimeout(bootGuard);
+    hideLoading();
+    showScreen('s-login');
+  } catch (e) {
+    console.error('[Admin Boot] fatal:', e);
+    clearTimeout(bootGuard);
+    hideLoading();
+    showScreen('s-login');
   }
-  hideLoading();
-  showScreen('s-login');
 });
 
 function showScreen(id) {

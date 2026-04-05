@@ -38,8 +38,17 @@ function showScreen(id) {
 }
 
 /* ---- Loading overlay ---- */
-function showLoading() { document.getElementById('loading-overlay').classList.remove('hidden'); }
-function hideLoading() { document.getElementById('loading-overlay').classList.add('hidden'); }
+function showLoading() {
+  const el = document.getElementById('loading-overlay');
+  el.style.display = '';
+  el.classList.remove('hidden');
+}
+function hideLoading() {
+  const el = document.getElementById('loading-overlay');
+  el.classList.add('hidden');
+  // Force-remove from layout after transition completes
+  setTimeout(() => { el.style.display = 'none'; }, 400);
+}
 
 /* ---- Toast ---- */
 let toastTimer;
@@ -60,60 +69,72 @@ function showToast(msg, duration = 2000) {
    ============================================================ */
 window.addEventListener('DOMContentLoaded', async () => {
   showLoading();
-  initFirebase();
 
-  // Read ?uid= from URL
-  const params = new URLSearchParams(location.search);
-  const urlUid = params.get('uid');
-  if (urlUid) {
-    S.uid = urlUid;
-    history.replaceState(null, '', location.pathname);
-  } else {
-    // Try localStorage fallback
-    S.uid = localStorage.getItem('rm_uid');
-  }
-
-  if (!S.uid) {
+  // Safety net: force-hide overlay after 8s even if Firebase hangs
+  const bootGuard = setTimeout(() => {
     hideLoading();
     showScreen('s-no-uid');
-    return;
-  }
-  localStorage.setItem('rm_uid', S.uid);
+  }, 8000);
 
-  // Load settings
-  const settings = await dbGet('settings', 'app');
-  S.settings = settings || {};
+  try {
+    await initFirebase();
 
-  // Load user
-  const user = await dbGet('users', S.uid);
-
-  hideLoading();
-
-  if (!user || !user.registered) {
-    // Pre-fill from Telegram
-    const tgUser = tg?.initDataUnsafe?.user || {};
-    document.getElementById('reg-name').value = tgUser.first_name || user?.firstName || '';
-    document.getElementById('reg-phone').value = user?.phone || '';
-    if (user?.address) {
-      document.getElementById('reg-street').value = user.address.street || '';
-      document.getElementById('reg-house').value  = user.address.house  || '';
-      document.getElementById('reg-apt').value    = user.address.apt    || '';
-      S.regIntercom = !!user.address.intercom;
-      if (S.regIntercom) document.getElementById('reg-intercom-cb').classList.add('checked');
+    // Read ?uid= from URL
+    const params = new URLSearchParams(location.search);
+    const urlUid = params.get('uid');
+    if (urlUid) {
+      S.uid = urlUid;
+      history.replaceState(null, '', location.pathname);
+    } else {
+      S.uid = localStorage.getItem('rm_uid');
     }
-    showScreen('s-register');
-    return;
-  }
 
-  if (!user.consented) {
+    if (!S.uid) {
+      clearTimeout(bootGuard);
+      hideLoading();
+      showScreen('s-no-uid');
+      return;
+    }
+    localStorage.setItem('rm_uid', S.uid);
+
+    const settings = await dbGet('settings', 'app');
+    S.settings = settings || {};
+
+    const user = await dbGet('users', S.uid);
+
+    clearTimeout(bootGuard);
+    hideLoading();
+
+    if (!user || !user.registered) {
+      const tgUser = tg?.initDataUnsafe?.user || {};
+      document.getElementById('reg-name').value = tgUser.first_name || user?.firstName || '';
+      document.getElementById('reg-phone').value = user?.phone || '';
+      if (user?.address) {
+        document.getElementById('reg-street').value = user.address.street || '';
+        document.getElementById('reg-house').value  = user.address.house  || '';
+        document.getElementById('reg-apt').value    = user.address.apt    || '';
+        S.regIntercom = !!user.address.intercom;
+        if (S.regIntercom) document.getElementById('reg-intercom-cb').classList.add('checked');
+      }
+      showScreen('s-register');
+      return;
+    }
+
+    if (!user.consented) {
+      S.user = user;
+      loadOfferLink();
+      showScreen('s-consent');
+      return;
+    }
+
     S.user = user;
-    loadOfferLink();
-    showScreen('s-consent');
-    return;
+    enterMain();
+  } catch (e) {
+    console.error('[Boot] fatal:', e);
+    clearTimeout(bootGuard);
+    hideLoading();
+    showScreen('s-no-uid');
   }
-
-  S.user = user;
-  enterMain();
 });
 
 /* ============================================================

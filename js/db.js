@@ -5,16 +5,17 @@
 let db = null;
 let isReady = false;
 
-function initFirebase() {
+async function initFirebase() {
   try {
     if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
     db = firebase.firestore();
     db.enablePersistence({ synchronizeTabs: true }).catch(() => {});
+    await firebase.auth().signInAnonymously();
     isReady = true;
-    firebase.auth().signInAnonymously().catch(() => {});
   } catch (e) {
-    console.error('[DB] init error:', e);
-    isReady = false;
+    console.warn('[DB] init:', e.message);
+    // Auth failed or unavailable — still attempt Firestore (public rules)
+    isReady = !!db;
   }
 }
 
