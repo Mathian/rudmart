@@ -45,8 +45,8 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);
 .login-logo h1{font-size:20px;font-weight:800;letter-spacing:-.3px}
 .login-logo p{font-size:12px;color:var(--text3);margin-top:3px}
 .inp{width:100%;padding:13px 14px;border-radius:var(--rad2);border:1.5px solid var(--border2);
-  background:var(--bg3);color:var(--text);font-family:inherit;font-size:14px;outline:none;
-  transition:border-color var(--t);-webkit-appearance:none}
+  background:var(--bg3);color:var(--text);font-family:inherit;font-size:16px;outline:none;
+  transition:border-color var(--t);-webkit-appearance:none;touch-action:manipulation}
 .inp:focus{border-color:var(--r2)}
 .inp::placeholder{color:var(--text3)}
 .mb10{margin-bottom:10px}
