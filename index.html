@@ -24,10 +24,17 @@
      SPLASH
      ================================================================ -->
 <div class="screen active" id="s-splash">
-  <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;background:radial-gradient(ellipse at 50% 35%,rgba(166,0,0,.18) 0%,transparent 65%),var(--bg)">
-    <div class="splash-logo">🛒</div>
-    <div class="splash-name">RudMart</div>
-    <div class="splash-sub">Онлайн-супермаркет</div>
+  <div class="splash-inner">
+    <div class="splash-top">
+      <div class="splash-icon">🛒</div>
+      <div class="splash-logo-text">RudMart</div>
+      <div class="splash-sub">Онлайн-супермаркет</div>
+    </div>
+    <div class="splash-features">
+      <div class="splash-feat"><span class="splash-feat-ico">🚀</span><span>Быстрая доставка</span></div>
+      <div class="splash-feat"><span class="splash-feat-ico">🏷️</span><span>Клубные цены</span></div>
+      <div class="splash-feat"><span class="splash-feat-ico">📦</span><span>Более 30 000 товаров</span></div>
+    </div>
     <div class="loader-dots">
       <div class="dot"></div><div class="dot"></div><div class="dot"></div>
     </div>
@@ -150,11 +157,16 @@
       <div class="search-wrap">
         <div class="search-inp-wrap">
           <span class="search-ico-left">🔍</span>
-          <input class="search-inp" id="search-inp" type="search" placeholder="Поиск товаров…"
+          <input class="search-inp" id="search-inp" type="text" placeholder="Поиск товаров…"
+            autocomplete="off" autocorrect="off" spellcheck="false"
             oninput="onSearchInput(this.value)"
             onkeydown="if(event.key==='Enter'){performSearch();this.blur()}"
             onblur="closeDropdown()">
-          <button class="search-clear" id="search-clear" onclick="clearSearch()">✕</button>
+          <button class="search-clear" id="search-clear" onclick="clearSearch()" aria-label="Очистить">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+              <path d="M1 1l12 12M13 1L1 13" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            </svg>
+          </button>
         </div>
         <!-- Search dropdown -->
         <div class="search-dropdown" id="search-dropdown"></div>
@@ -172,6 +184,18 @@
       <h3>Категории</h3>
     </div>
     <div class="cats-grid" id="cats-grid"></div>
+
+    <!-- For You feed -->
+    <div id="for-you-section" style="display:none">
+      <div class="section-hdr">
+        <h3>Для вас</h3>
+        <span style="font-size:12px;color:var(--text3)">На основе ваших интересов</span>
+      </div>
+      <div class="products-grid" id="for-you-grid" style="padding:0 16px"></div>
+      <div style="padding:8px 16px 0">
+        <button class="btn btn-out btn-sm" id="for-you-more" onclick="loadMoreForYou()" style="display:none">Ещё товары</button>
+      </div>
+    </div>
 
     <!-- Best Offers -->
     <div id="best-offers-section">
@@ -509,6 +533,50 @@
 </div>
 
 <!-- ================================================================
+     MY ORDER DETAIL SCREEN
+     ================================================================ -->
+<div class="screen" id="s-my-order-detail">
+  <div class="profile-hdr">
+    <button class="back-btn" onclick="closeMyOrderDetail()">←</button>
+    <h2 id="mod-id-title">Заказ</h2>
+  </div>
+  <div class="scroll-view" style="padding:12px 16px">
+
+    <div style="margin-bottom:14px">
+      <div class="my-order-status" id="mod-status" style="display:inline-flex;margin-bottom:10px"></div>
+      <div style="font-size:12px;color:var(--text2)" id="mod-date"></div>
+    </div>
+
+    <!-- Info -->
+    <div style="background:var(--card);border:1px solid var(--border2);border-radius:var(--r2);padding:14px;margin-bottom:14px">
+      <div class="detail-info-row"><span style="color:var(--text2);font-size:13px">Адрес</span><span style="font-weight:700;font-size:13px;text-align:right;max-width:60%" id="mod-address"></span></div>
+      <div class="detail-info-row"><span style="color:var(--text2);font-size:13px">Оплата</span><span style="font-weight:700;font-size:13px" id="mod-payment"></span></div>
+      <div class="detail-info-row" id="mod-comment-row"><span style="color:var(--text2);font-size:13px">Комментарий</span><span style="font-weight:700;font-size:13px;text-align:right;max-width:60%" id="mod-comment"></span></div>
+    </div>
+
+    <!-- Items -->
+    <div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:10px">Состав заказа</div>
+    <div id="mod-items"></div>
+
+    <!-- Total -->
+    <div style="background:var(--card);border:1px solid var(--border2);border-radius:var(--r2);padding:14px;margin-top:12px">
+      <div class="detail-info-row" style="border:none;padding:0">
+        <span style="font-size:15px;font-weight:900">Итого</span>
+        <span style="font-size:17px;font-weight:900;color:var(--red2)" id="mod-total"></span>
+      </div>
+    </div>
+
+    <!-- Cancel -->
+    <div id="mod-cancel-wrap" style="margin-top:14px;display:none">
+      <button class="btn btn-out" style="color:var(--red-err);border-color:var(--red-err)"
+        onclick="cancelMyOrder(null, null, true)">Отменить заказ</button>
+    </div>
+
+    <div style="height:20px"></div>
+  </div>
+</div>
+
+<!-- ================================================================
      ORDER SUCCESS MODAL
      ================================================================ -->
 <div class="modal-overlay" id="order-success-modal" onclick="if(event.target===this)closeOrderSuccess()">
@@ -535,7 +603,7 @@
 <script src="js/config.js?v=2"></script>
 <script src="js/db.js?v=2"></script>
 <script src="js/utils.js?v=2"></script>
-<script src="js/app.js?v=2"></script>
+<script src="js/app.js?v=3"></script>
 
 <script>
   // Set delivery cost label

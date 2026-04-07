@@ -205,6 +205,7 @@ async function initMain() {
   renderCartUserName();
 
   // Load data
+  loadActivityData();
   await Promise.all([
     syncCartFromDB(),
     syncFavsFromDB(),
@@ -239,7 +240,132 @@ function switchTab(tab) {
    ================================================================ */
 async function renderShop() {
   renderCategories();
-  await Promise.all([loadBanners(), loadBestOffers()]);
+  await Promise.all([loadBanners(), loadBestOffers(), loadForYou()]);
+}
+
+/* ================================================================
+   FOR YOU FEED — релевантная лента
+   ================================================================ */
+
+// Собираем сигналы интереса из STATE
+function collectInterestSignals() {
+  const signals = new Map(); // categoryId → score
+
+  // Корзина — вес 3
+  Object.values(STATE.cart).forEach(item => {
+    const cat = item.product?.category;
+    if (cat) signals.set(cat, (signals.get(cat) || 0) + 3);
+  });
+
+  // Избранное — вес 2
+  STATE.favorites.forEach(id => {
+    const cached = STATE._prodCache?.[id];
+    if (cached?.category) signals.set(cached.category, (signals.get(cached.category) || 0) + 2);
+  });
+
+  // История просмотра — вес 1
+  (STATE._viewHistory || []).forEach(cat => {
+    if (cat) signals.set(cat, (signals.get(cat) || 0) + 1);
+  });
+
+  // Купленные заказы — вес 4
+  (STATE._purchasedCategories || []).forEach(cat => {
+    if (cat) signals.set(cat, (signals.get(cat) || 0) + 4);
+  });
+
+  return [...signals.entries()].sort((a, b) => b[1] - a[1]);
+}
+
+let _forYouLastCat = null;
+let _forYouLastDoc = null;
+let _forYouShown   = new Set();
+
+async function loadForYou(append = false) {
+  if (!append) {
+    _forYouLastCat = null;
+    _forYouLastDoc = null;
+    _forYouShown   = new Set();
+  }
+
+  const section = document.getElementById('for-you-section');
+  const grid    = document.getElementById('for-you-grid');
+  const moreBtn = document.getElementById('for-you-more');
+  if (!section || !grid) return;
+
+  const signals = collectInterestSignals();
+
+  // Если совсем нет сигналов — скрываем блок
+  if (!signals.length && !append) {
+    section.style.display = 'none';
+    return;
+  }
+
+  // Берём первую (самую релевантную) категорию или fallback 'other'
+  const targetCat = _forYouLastCat || signals[0]?.[0] || 'other';
+  _forYouLastCat = targetCat;
+
+  try {
+    let ref = db.collection('products')
+      .where('category', '==', targetCat)
+      .limit(10);
+    if (_forYouLastDoc) ref = ref.startAfter(_forYouLastDoc);
+
+    const snap = await ref.get();
+    const docs = snap.docs.filter(d => !_forYouShown.has(d.id));
+
+    if (!docs.length) {
+      if (moreBtn) moreBtn.style.display = 'none';
+      return;
+    }
+
+    docs.forEach(d => {
+      const p = { id: d.id, ...d.data() };
+      _forYouShown.add(d.id);
+      // Cache for future signal collection
+      if (!STATE._prodCache) STATE._prodCache = {};
+      STATE._prodCache[d.id] = p;
+      const el = document.createElement('div');
+      el.innerHTML = makeCard(p, 'grid');
+      grid.appendChild(el.firstElementChild);
+    });
+
+    _forYouLastDoc = snap.docs[snap.docs.length - 1] || null;
+    section.style.display = '';
+    if (moreBtn) moreBtn.style.display = docs.length >= 10 ? 'block' : 'none';
+  } catch (e) {
+    section.style.display = 'none';
+  }
+}
+
+function loadMoreForYou() {
+  loadForYou(true);
+}
+
+// Записываем просмотренную категорию в историю
+function trackViewHistory(category) {
+  if (!category) return;
+  if (!STATE._viewHistory) STATE._viewHistory = [];
+  STATE._viewHistory.unshift(category);
+  if (STATE._viewHistory.length > 50) STATE._viewHistory.pop();
+  try {
+    localStorage.setItem('rm_view_history',
+      JSON.stringify([...new Set(STATE._viewHistory)].slice(0, 20)));
+  } catch (_) {}
+}
+
+// Загружаем историю и купленные категории
+function loadActivityData() {
+  try {
+    STATE._viewHistory = JSON.parse(localStorage.getItem('rm_view_history') || '[]');
+  } catch (_) { STATE._viewHistory = []; }
+
+  // Купленные категории из корзины/заказов уже в STATE.cart
+  STATE._purchasedCategories = [];
+  Object.values(STATE.cart).forEach(item => {
+    const cat = item.product?.category;
+    if (cat && !STATE._purchasedCategories.includes(cat))
+      STATE._purchasedCategories.push(cat);
+  });
 }
 
 async function loadBanners() {
@@ -323,6 +449,7 @@ async function loadBestOffers() {
 async function openCategory(catId) {
   STATE.currentCat = catId;
   STATE.catPageLast = null;
+  trackViewHistory(catId);
   STATE.catProductsLoaded = false;
 
   const cat = SUPERMARKET_CATEGORIES.find(c => c.id === catId);
@@ -521,6 +648,7 @@ function makeCard(p, type) {
    PRODUCT DETAIL
    ================================================================ */
 async function openProduct(id) {
+  if (!STATE._productReturnTo) STATE._productReturnTo = null; // will be set by caller if needed
   showLoading();
   let p = await dbGet('products', id);
   hideLoading();
@@ -617,6 +745,10 @@ async function openProduct(id) {
   // Store current product
   STATE._currentProductId = id;
   STATE._currentProduct = p;
+  // Track for relevance feed
+  trackViewHistory(p.category);
+  if (!STATE._prodCache) STATE._prodCache = {};
+  STATE._prodCache[id] = p;
 
   document.getElementById('s-main').classList.remove('active');
   document.getElementById('s-category').classList.remove('active');
@@ -638,9 +770,22 @@ function updateProductDetail(id) {
   }
 }
 
+async function openProductFromCart(id) {
+  // Remember we came from cart tab
+  STATE._productReturnTo = 'cart';
+  await openProduct(id);
+}
+
 function closeProductScreen() {
   document.getElementById('s-product').classList.remove('active');
-  // Return to whichever screen was showing
+  // Return to correct screen
+  if (STATE._productReturnTo === 'cart') {
+    STATE._productReturnTo = null;
+    document.getElementById('s-main').classList.add('active');
+    if (tg) tg.BackButton.hide();
+    switchTab('cart');
+    return;
+  }
   const cat = STATE.currentCat;
   if (cat && document.getElementById('cat-products-list')?.children.length) {
     document.getElementById('s-category').classList.add('active');
@@ -870,11 +1015,11 @@ function renderCart() {
     <div class="cart-item">
       <input type="checkbox" class="cart-item-cb" ${item.checked !== false ? 'checked' : ''}
         onchange="toggleCartItem('${esc(id)}')">
-      <div class="cart-item-img">
+      <div class="cart-item-img" onclick="openProductFromCart('${esc(id)}')" style="cursor:pointer">
         ${p.imageUrl ? `<img src="${esc(p.imageUrl)}" loading="lazy">` : (p.emoji || '🛒')}
       </div>
       <div class="cart-item-body">
-        <div class="cart-item-name">${esc(p.name || id)}</div>
+        <div class="cart-item-name" onclick="openProductFromCart('${esc(id)}')" style="cursor:pointer">${esc(p.name || id)}</div>
         <div class="prod-actions" style="margin-top:6px">
           <div class="qty-ctrl">
             <button class="qty-btn" onclick="changeQty('${esc(id)}',-1)">−</button>
@@ -1198,7 +1343,11 @@ async function openMyOrders() {
   }
 }
 
+// Хранит все загруженные заказы для детального просмотра
+let _myOrders = [];
+
 function renderMyOrders(orders) {
+  _myOrders = orders;
   const list = document.getElementById('my-orders-list');
   if (!list) return;
 
@@ -1222,7 +1371,7 @@ function renderMyOrders(orders) {
     const canCancel = cancellable.includes(o.status);
 
     return `
-    <div class="my-order-card">
+    <div class="my-order-card" onclick="openMyOrderDetail('${esc(o.id)}')">
       <div class="my-order-top">
         <div class="my-order-id">${esc(o.id)}</div>
         <div class="my-order-date">${fmtDate(o.createdAt)}</div>
@@ -1233,7 +1382,7 @@ function renderMyOrders(orders) {
         <div class="my-order-status ${statusClass}">${statusLabel}</div>
       </div>
       ${canCancel ? `
-      <div class="my-order-cancel">
+      <div class="my-order-cancel" onclick="event.stopPropagation()">
         <button class="btn btn-out btn-sm" style="color:var(--red-err);border-color:var(--red-err)"
           onclick="cancelMyOrder('${esc(o.id)}', this)">Отменить заказ</button>
       </div>` : ''}
@@ -1241,14 +1390,86 @@ function renderMyOrders(orders) {
   }).join('');
 }
 
-async function cancelMyOrder(orderId, btn) {
-  if (!confirm('Отменить заказ ' + orderId + '?')) return;
+function openMyOrderDetail(orderId) {
+  const o = _myOrders.find(x => x.id === orderId);
+  if (!o) return;
+  STATE._currentDetailOrder = o;
+
+  setText('mod-id-title', o.id);
+  setText('mod-date', fmtDate(o.createdAt));
+
+  const statusEl = document.getElementById('mod-status');
+  if (statusEl) {
+    statusEl.textContent = ORDER_STATUS_LABELS_BUYER[o.status] || o.status;
+    statusEl.className = 'my-order-status mos-' + (o.status || 'new');
+  }
+
+  const addr = o.address;
+  setText('mod-address', addr
+    ? `${addr.street}, д.${addr.house}${addr.apt ? ', кв.' + addr.apt : ''}${addr.intercom ? ' (домофон)' : ''}`
+    : '—');
+
+  const pay = o.payment;
+  setText('mod-payment', pay
+    ? (pay.method === 'cash'
+        ? `Наличные${pay.changeFrom ? ` (сдача с ${pay.changeFrom} ₸)` : ''}`
+        : `Карта${pay.bank ? ' ' + pay.bank : ''}`)
+    : '—');
+
+  const commentRow = document.getElementById('mod-comment-row');
+  if (o.comment) {
+    setText('mod-comment', o.comment);
+    if (commentRow) commentRow.style.display = '';
+  } else {
+    if (commentRow) commentRow.style.display = 'none';
+  }
+
+  // Items
+  const itemsEl = document.getElementById('mod-items');
+  if (itemsEl) {
+    itemsEl.innerHTML = (o.items || []).map(item => `
+      <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;
+        background:var(--card);border:1px solid var(--border2);border-radius:var(--r2);margin-bottom:8px">
+        <div style="flex:1;font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(item.name)}</div>
+        <div style="font-size:12px;color:var(--text2);white-space:nowrap">× ${item.qty}</div>
+        <div style="font-size:13px;font-weight:800;color:var(--red2);white-space:nowrap">${fmtPrice((item.price || 0) * item.qty)}</div>
+      </div>`).join('');
+  }
+
+  setText('mod-total', fmtPrice(o.total));
+
+  // Cancel button
+  const cancelWrap = document.getElementById('mod-cancel-wrap');
+  if (cancelWrap)
+    cancelWrap.style.display = ['new', 'accepted'].includes(o.status) ? 'block' : 'none';
+
+  document.getElementById('s-my-orders').classList.remove('active');
+  document.getElementById('s-my-order-detail').classList.add('active');
+  if (tg) tg.BackButton.show();
+}
+
+function closeMyOrderDetail() {
+  document.getElementById('s-my-order-detail').classList.remove('active');
+  document.getElementById('s-my-orders').classList.add('active');
+}
+
+async function cancelMyOrder(orderId, btn, fromDetail = false) {
+  const id = orderId || STATE._currentDetailOrder?.id;
+  if (!id) return;
+  if (!confirm('Отменить заказ ' + id + '?')) return;
   if (btn) { btn.disabled = true; btn.textContent = 'Отмена…'; }
   try {
-    await dbSet('orders', orderId, { status: 'cancelled' });
+    await dbSet('orders', id, { status: 'cancelled' });
     showToast('Заказ отменён', 'ok');
-    // Refresh list
-    await openMyOrders();
+    // Update local cache
+    const o = _myOrders.find(x => x.id === id);
+    if (o) o.status = 'cancelled';
+    if (fromDetail) {
+      // Refresh detail screen
+      openMyOrderDetail(id);
+    } else {
+      renderMyOrders(_myOrders);
+    }
   } catch (e) {
     showToast('Ошибка отмены', 'err');
     if (btn) { btn.disabled = false; btn.textContent = 'Отменить заказ'; }
@@ -1257,6 +1478,7 @@ async function cancelMyOrder(orderId, btn) {
 
 function closeMyOrders() {
   document.getElementById('s-my-orders').classList.remove('active');
+  document.getElementById('s-my-order-detail').classList.remove('active');
   document.getElementById('s-main').classList.add('active');
   if (tg) tg.BackButton.hide();
 }
