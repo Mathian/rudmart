@@ -607,71 +607,115 @@ async function startImport() {
   const file = input.files[0];
   const defaultCat = document.getElementById('import-category')?.value || 'other';
 
-  showLoading();
+  const progress = document.getElementById('import-progress');
+  const fill     = document.getElementById('import-fill');
+  const label    = document.getElementById('import-label');
+
+  const setProgress = (text, pct) => {
+    if (fill)  fill.style.width = pct + '%';
+    if (label) label.textContent = text;
+  };
+
   const reader = new FileReader();
   reader.onload = async e => {
-    hideLoading();
     try {
+      // 1. Parse XLSX
       const data  = new Uint8Array(e.target.result);
       const wb    = XLSX.read(data, { type: 'array' });
       const ws    = wb.Sheets[wb.SheetNames[0]];
       const rows  = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
 
-      // Skip header row if first cell looks like text
-      const startRow = (typeof rows[0][0] === 'string' && isNaN(Number(rows[0][0]))) ? 1 : 0;
+      const startRow = (typeof rows[0]?.[0] === 'string' && isNaN(Number(rows[0][0]))) ? 1 : 0;
       const dataRows = rows.slice(startRow).filter(r => r[0]);
 
       if (!dataRows.length) { showToast('Нет данных в файле', 'err'); return; }
 
-      const progress = document.getElementById('import-progress');
-      const fill     = document.getElementById('import-fill');
-      const label    = document.getElementById('import-label');
       if (progress) progress.classList.add('show');
+      setProgress(`Парсинг ${dataRows.length} строк…`, 0);
 
-      let created = 0, updated = 0;
-      const items = [];
-
+      // 2. Parse all rows into map { barcode → rowData }
+      const parsed = new Map();
       for (const row of dataRows) {
-        const barcode    = String(row[0] || '').trim();
+        const barcode = String(row[0] || '').trim();
         if (!barcode) continue;
-        const name       = String(row[1] || '').trim();
-        const price      = parseFloat(row[3]) || 0;
-        const clubPrice  = parseFloat(row[4]) || 0;
-        const promoPrice = parseFloat(row[5]) || 0;
-        const promoStart = parseExcelDate(row[6]);
-        const promoEnd   = parseExcelDate(row[7]);
-        const stock      = parseInt(row[9]) || 0;
+        parsed.set(barcode, {
+          name:       String(row[1] || '').trim(),
+          price:      parseFloat(row[3]) || 0,
+          clubPrice:  parseFloat(row[4]) || 0,
+          promoPrice: parseFloat(row[5]) || 0,
+          promoStart: parseExcelDate(row[6]),
+          promoEnd:   parseExcelDate(row[7]),
+          stock:      parseInt(row[9]) || 0,
+        });
+      }
+      const barcodes = [...parsed.keys()];
 
-        // Check existing
-        const existing = await dbGet('products', barcode);
+      // 3. Batch-check existence: 30 IDs per query, 10 concurrent
+      setProgress(`Проверка ${barcodes.length} товаров в базе…`, 5);
+      const existingSet = new Set();
+      const chunks = [];
+      for (let i = 0; i < barcodes.length; i += 30) chunks.push(barcodes.slice(i, i + 30));
 
-        const productData = existing
-          ? { price, clubPrice, promoPrice, promoStart, promoEnd, stock,
-              name, nameLower: name.toLowerCase() }
-          : { barcode, name, nameLower: name.toLowerCase(),
-              price, clubPrice, promoPrice, promoStart, promoEnd, stock,
-              category: defaultCat, imageUrl: '', emoji: '',
-              brand:'', volume:'', mass:'', fat:'', alcohol:'',
-              protein:'', fat100:'', carbs:'', carbonated: false, isBestOffer: false,
-              createdAt: new Date().toISOString() };
-
-        items.push({ id: barcode, data: productData });
-        if (existing) updated++; else created++;
+      const CONCURRENT = 10;
+      for (let i = 0; i < chunks.length; i += CONCURRENT) {
+        const batch = chunks.slice(i, i + CONCURRENT);
+        const results = await Promise.all(batch.map(ids =>
+          db.collection('products')
+            .where(firebase.firestore.FieldPath.documentId(), 'in', ids)
+            .select()   // fetch no fields, only IDs — fastest possible
+            .get()
+        ));
+        results.forEach(snap => snap.docs.forEach(d => existingSet.add(d.id)));
+        const checked = Math.min((i + CONCURRENT) * 30, barcodes.length);
+        setProgress(`Проверка: ${checked} / ${barcodes.length}…`, 5 + Math.round(checked / barcodes.length * 20));
       }
 
-      // Batch write
+      // 4. Build batch items
+      let created = 0, updated = 0;
+      const items = [];
+      const now = new Date().toISOString();
+
+      for (const [barcode, r] of parsed) {
+        if (existingSet.has(barcode)) {
+          // Update only volatile fields — do NOT touch category/image/chars
+          items.push({ id: barcode, data: {
+            name: r.name, nameLower: r.name.toLowerCase(),
+            price: r.price, clubPrice: r.clubPrice,
+            promoPrice: r.promoPrice, promoStart: r.promoStart, promoEnd: r.promoEnd,
+            stock: r.stock,
+          }});
+          updated++;
+        } else {
+          // Create with full default data
+          items.push({ id: barcode, data: {
+            barcode, name: r.name, nameLower: r.name.toLowerCase(),
+            price: r.price, clubPrice: r.clubPrice,
+            promoPrice: r.promoPrice, promoStart: r.promoStart, promoEnd: r.promoEnd,
+            stock: r.stock,
+            category: defaultCat, imageUrl: '', emoji: '',
+            brand:'', volume:'', mass:'', fat:'', alcohol:'',
+            protein:'', fat100:'', carbs:'', carbonated: false, isBestOffer: false,
+            createdAt: now,
+          }});
+          created++;
+        }
+      }
+
+      // 5. Batch write with progress
       await dbBatchSet('products', items, (done, total) => {
-        const pct = Math.round(done / total * 100);
-        if (fill)  fill.style.width = pct + '%';
-        if (label) label.textContent = `${done} / ${total} товаров (${pct}%)`;
+        const pct = 25 + Math.round(done / total * 75);
+        setProgress(`Запись: ${done} / ${total} товаров…`, pct);
       });
 
       if (progress) progress.classList.remove('show');
       hideImportModal();
-      showToast(`Импорт завершён: ${created} добавлено, ${updated} обновлено ✓`, 'ok');
+      input.value = '';
+      document.getElementById('import-file-name').textContent = 'Выбрать файл';
+      showToast(`Импорт завершён: +${created} новых, ✏️${updated} обновлено`, 'ok');
       if (ADMIN.currentTab === 'shop') loadAdminProducts(true);
     } catch (err) {
-      showToast('Ошибка чтения файла: ' + err.message, 'err');
+      if (progress) progress.classList.remove('show');
+      showToast('Ошибка: ' + err.message, 'err');
     }
   };
   reader.readAsArrayBuffer(file);

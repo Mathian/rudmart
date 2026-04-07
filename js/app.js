@@ -348,7 +348,7 @@ async function loadCategoryProducts() {
   list.appendChild(spinner);
 
   const { docs, last } = await dbQueryPage('products',
-    [['category', '==', STATE.currentCat], ['stock', '>', -9999]],
+    [['category', '==', STATE.currentCat]],
     PRODUCTS_PER_PAGE, STATE.catPageLast);
 
   list.removeChild(spinner);
@@ -575,7 +575,6 @@ async function openProduct(id) {
   if (p.protein != null && p.protein !== '') chars.push(['Белки (100г)', p.protein + ' г']);
   if (p.fat100 != null && p.fat100 !== '')   chars.push(['Жиры (100г)', p.fat100 + ' г']);
   if (p.carbs != null && p.carbs !== '')     chars.push(['Углеводы (100г)', p.carbs + ' г']);
-  if (p.barcode)     chars.push(['Штрих-код', p.barcode]);
 
   const charsEl = document.getElementById('pd-chars');
   if (charsEl) {
