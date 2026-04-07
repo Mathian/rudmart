@@ -25,9 +25,7 @@
      ================================================================ -->
 <div class="screen active" id="s-splash">
   <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;background:radial-gradient(ellipse at 50% 35%,rgba(166,0,0,.18) 0%,transparent 65%),var(--bg)">
-    <div class="splash-logo">
-      <img src="../RudMart - 1.png" alt="RudMart">
-    </div>
+    <div class="splash-logo">🛒</div>
     <div class="splash-name">RudMart</div>
     <div class="splash-sub">Онлайн-супермаркет</div>
     <div class="loader-dots">
@@ -55,7 +53,7 @@
 <div class="screen" id="s-register">
   <div class="reg-wrap">
     <div class="reg-logo">
-      <img src="../RudMart - 1.png" alt="RudMart">
+      <div style="font-size:52px;margin-bottom:8px">🛒</div>
       <h2>Добро пожаловать!</h2>
       <p>Заполните данные для заказов</p>
     </div>
@@ -146,7 +144,8 @@
     <!-- Header + Search -->
     <div class="shop-header">
       <div class="shop-brand">
-        <img src="../RudMart - 1.png" alt="RudMart">
+        <span style="font-size:28px">🛒</span>
+        <span class="shop-brand-name">RudMart</span>
       </div>
       <div class="search-wrap">
         <div class="search-inp-wrap">
@@ -243,6 +242,11 @@
           Оформить заказ →
         </button>
       </div>
+    </div>
+
+    <!-- Мои заказы -->
+    <div class="cart-orders-btn-wrap">
+      <button class="btn btn-out" onclick="openMyOrders()">📋 Мои заказы</button>
     </div>
 
     <div style="height:20px"></div>
@@ -491,6 +495,17 @@
   <div class="checkout-footer">
     <button class="btn btn-red" onclick="confirmOrder()">Подтвердить заказ →</button>
   </div>
+</div>
+
+<!-- ================================================================
+     MY ORDERS SCREEN
+     ================================================================ -->
+<div class="screen" id="s-my-orders">
+  <div class="profile-hdr">
+    <button class="back-btn" onclick="closeMyOrders()">←</button>
+    <h2>Мои заказы</h2>
+  </div>
+  <div class="scroll-view" id="my-orders-list" style="padding:12px 16px"></div>
 </div>
 
 <!-- ================================================================

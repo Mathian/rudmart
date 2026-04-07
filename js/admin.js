@@ -188,15 +188,14 @@ function openOrderDetail(orderId) {
   setText('od-comment',  order.comment || '—');
   setText('od-total',    fmtPrice(order.total));
 
-  // Items
+  // Items (read-only — editing not allowed)
   const itemsEl = document.getElementById('od-items');
   if (itemsEl) {
-    itemsEl.innerHTML = (order.items || []).map((item, i) => `
-      <div class="order-item-row" id="od-item-${i}">
+    itemsEl.innerHTML = (order.items || []).map(item => `
+      <div class="order-item-row">
         <div class="order-item-name">${esc(item.name || item.barcode)}</div>
         <div class="order-item-qty">× ${item.qty}</div>
         <div class="order-item-price">${fmtPrice((item.price||0) * item.qty)}</div>
-        <button class="order-item-del" onclick="removeOrderItem(${i})" title="Удалить">✕</button>
       </div>`).join('');
   }
 
@@ -229,6 +228,8 @@ function renderOrderActions(status) {
     btns.push(`<button class="btn btn-ghost btn-sm" onclick="updateOrderStatus('cancelled')">✕ Отменить</button>`);
   } else if (status === 'collected') {
     btns.push(`<button class="btn btn-green btn-sm" onclick="updateOrderStatus('sent')">🚚 Отправлен</button>`);
+  } else if (status === 'cancelled') {
+    btns.push(`<button class="btn btn-blue btn-sm" onclick="updateOrderStatus('new')">↩ Принять заново</button>`);
   }
 
   // Call client button
@@ -250,40 +251,6 @@ async function updateOrderStatus(newStatus) {
   showToast('Статус обновлён ✓', 'ok');
 }
 
-function removeOrderItem(idx) {
-  if (!ADMIN.currentOrder) return;
-  const items = [...(ADMIN.currentOrder.items || [])];
-  items.splice(idx, 1);
-  ADMIN.currentOrder.items = items;
-
-  // Recalc total
-  let total = items.reduce((s, i) => s + (i.price || 0) * i.qty, 0) + DELIVERY_COST;
-  ADMIN.currentOrder.total = total;
-
-  // Re-render items
-  const itemsEl = document.getElementById('od-items');
-  if (itemsEl) {
-    itemsEl.innerHTML = items.map((item, i) => `
-      <div class="order-item-row">
-        <div class="order-item-name">${esc(item.name)}</div>
-        <div class="order-item-qty">× ${item.qty}</div>
-        <div class="order-item-price">${fmtPrice((item.price||0) * item.qty)}</div>
-        <button class="order-item-del" onclick="removeOrderItem(${i})">✕</button>
-      </div>`).join('');
-  }
-  setText('od-total', fmtPrice(total));
-}
-
-async function saveOrderEdits() {
-  if (!ADMIN.currentOrder) return;
-  showLoading();
-  await dbSet('orders', ADMIN.currentOrder.id, {
-    items: ADMIN.currentOrder.items,
-    total: ADMIN.currentOrder.total,
-  });
-  hideLoading();
-  showToast('Заказ сохранён ✓', 'ok');
-}
 
 function closeOrderDetail() {
   document.getElementById('s-order-detail').classList.remove('active');

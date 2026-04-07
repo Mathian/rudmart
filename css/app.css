@@ -56,13 +56,13 @@ html, body { height:100%; overflow:hidden; background:var(--bg); color:var(--tex
 .screen.slide-in { transform:translateY(0) !important; transition: transform .3s var(--ease); }
 
 /* slide-up screens come from bottom */
-#s-product, #s-category, #s-search, #s-profile, #s-checkout {
+#s-product, #s-category, #s-search, #s-profile, #s-checkout, #s-my-orders {
   transform:translateY(100%);
   transition: transform .32s var(--ease);
   z-index:200;
 }
 #s-product.active, #s-category.active, #s-search.active,
-#s-profile.active, #s-checkout.active {
+#s-profile.active, #s-checkout.active, #s-my-orders.active {
   opacity:1; pointer-events:all; transform:translateY(0);
 }
 
@@ -110,10 +110,12 @@ html, body { height:100%; overflow:hidden; background:var(--bg); color:var(--tex
   align-items:center; justify-content:center;
   background: radial-gradient(ellipse at 50% 35%,rgba(166,0,0,.18) 0%,transparent 65%),var(--bg);
 }
-.splash-logo { width:96px; height:96px; border-radius:24px; overflow:hidden;
+.splash-logo { width:96px; height:96px; border-radius:24px;
+  background:var(--reddim); border:2px solid var(--red);
+  display:flex; align-items:center; justify-content:center;
+  font-size:52px; line-height:1;
   box-shadow:0 0 60px var(--redglow); margin-bottom:24px;
   animation:splPulse 2.2s ease-in-out infinite; }
-.splash-logo img { width:100%; height:100%; object-fit:cover; background:#fff; }
 .splash-name { font-size:32px; font-weight:900; color:var(--text); letter-spacing:.5px; margin-bottom:4px; }
 .splash-sub  { font-size:12px; color:var(--text3); letter-spacing:2px; text-transform:uppercase; margin-bottom:48px; }
 .loader-dots { display:flex; gap:8px; }
@@ -608,6 +610,33 @@ html, body { height:100%; overflow:hidden; background:var(--bg); color:var(--tex
 }
 .bank-btn.sel { border-color:var(--red); color:var(--red2); background:var(--reddim); }
 .checkout-footer { padding:0 16px 16px; }
+
+/* ================================================================
+   MY ORDERS
+   ================================================================ */
+.cart-orders-btn-wrap { padding:0 16px 4px; }
+
+.my-order-card {
+  background:var(--card); border:1px solid var(--border2);
+  border-radius:var(--r2); padding:14px; margin-bottom:10px;
+}
+.my-order-top { display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; }
+.my-order-id  { font-size:13px; font-weight:800; color:var(--text); }
+.my-order-date{ font-size:11px; color:var(--text2); }
+.my-order-items { font-size:12px; color:var(--text2); margin-bottom:8px; line-height:1.6; }
+.my-order-bot { display:flex; align-items:center; justify-content:space-between; }
+.my-order-total { font-size:15px; font-weight:900; color:var(--text); }
+.my-order-status {
+  padding:4px 10px; border-radius:8px; font-size:11px; font-weight:800;
+}
+.mos-new      { background:rgba(59,130,246,.12); color:#3b82f6; }
+.mos-accepted { background:rgba(245,158,11,.12); color:#f59e0b; }
+.mos-collected{ background:rgba(249,115,22,.12); color:var(--orange); }
+.mos-sent     { background:rgba(34,197,94,.12);  color:var(--green); }
+.mos-cancelled{ background:rgba(239,68,68,.1);   color:var(--red-err); }
+.my-order-cancel {
+  margin-top:10px; padding-top:10px; border-top:1px solid var(--border);
+}
 
 /* ================================================================
    SCROLL UTILITY

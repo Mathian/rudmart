@@ -1164,3 +1164,98 @@ function closeOrderSuccess() {
   document.getElementById('order-success-modal')?.classList.remove('show');
   switchTab('shop');
 }
+
+/* ================================================================
+   MY ORDERS
+   ================================================================ */
+const ORDER_STATUS_LABELS_BUYER = {
+  new:       '🕐 Новый',
+  accepted:  '✓ Принят',
+  collected: '📦 Собирается',
+  sent:      '🚚 В доставке',
+  cancelled: '✕ Отменён',
+};
+
+async function openMyOrders() {
+  const list = document.getElementById('my-orders-list');
+  if (list) list.innerHTML = '<div style="text-align:center;padding:40px 0;color:var(--text3)">Загрузка…</div>';
+
+  document.getElementById('s-main').classList.remove('active');
+  document.getElementById('s-my-orders').classList.add('active');
+  if (tg) tg.BackButton.show();
+
+  try {
+    const snap = await db.collection('orders')
+      .where('uid', '==', STATE.uid)
+      .orderBy('createdAt', 'desc')
+      .limit(50)
+      .get();
+    const orders = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    renderMyOrders(orders);
+  } catch (e) {
+    if (list) list.innerHTML = '<div style="text-align:center;padding:40px 0;color:var(--text3)">Ошибка загрузки</div>';
+  }
+}
+
+function renderMyOrders(orders) {
+  const list = document.getElementById('my-orders-list');
+  if (!list) return;
+
+  if (!orders.length) {
+    list.innerHTML = `
+      <div class="empty-state">
+        <div class="empty-ico">📋</div>
+        <div class="empty-title">Заказов пока нет</div>
+        <div class="empty-sub">Оформите первый заказ в магазине</div>
+      </div>`;
+    return;
+  }
+
+  const cancellable = ['new', 'accepted'];
+
+  list.innerHTML = orders.map(o => {
+    const statusClass = 'mos-' + (o.status || 'new');
+    const statusLabel = ORDER_STATUS_LABELS_BUYER[o.status] || o.status;
+    const itemsSummary = (o.items || []).slice(0, 3).map(i => i.name).join(', ')
+      + ((o.items || []).length > 3 ? ` и ещё ${o.items.length - 3}…` : '');
+    const canCancel = cancellable.includes(o.status);
+
+    return `
+    <div class="my-order-card">
+      <div class="my-order-top">
+        <div class="my-order-id">${esc(o.id)}</div>
+        <div class="my-order-date">${fmtDate(o.createdAt)}</div>
+      </div>
+      <div class="my-order-items">${esc(itemsSummary)}</div>
+      <div class="my-order-bot">
+        <div class="my-order-total">${fmtPrice(o.total)}</div>
+        <div class="my-order-status ${statusClass}">${statusLabel}</div>
+      </div>
+      ${canCancel ? `
+      <div class="my-order-cancel">
+        <button class="btn btn-out btn-sm" style="color:var(--red-err);border-color:var(--red-err)"
+          onclick="cancelMyOrder('${esc(o.id)}', this)">Отменить заказ</button>
+      </div>` : ''}
+    </div>`;
+  }).join('');
+}
+
+async function cancelMyOrder(orderId, btn) {
+  if (!confirm('Отменить заказ ' + orderId + '?')) return;
+  if (btn) { btn.disabled = true; btn.textContent = 'Отмена…'; }
+  try {
+    await dbSet('orders', orderId, { status: 'cancelled' });
+    showToast('Заказ отменён', 'ok');
+    // Refresh list
+    await openMyOrders();
+  } catch (e) {
+    showToast('Ошибка отмены', 'err');
+    if (btn) { btn.disabled = false; btn.textContent = 'Отменить заказ'; }
+  }
+}
+
+function closeMyOrders() {
+  document.getElementById('s-my-orders').classList.remove('active');
+  document.getElementById('s-main').classList.add('active');
+  if (tg) tg.BackButton.hide();
+}
