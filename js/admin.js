@@ -629,7 +629,6 @@ async function startImport() {
         const results = await Promise.all(batch.map(ids =>
           db.collection('products')
             .where(firebase.firestore.FieldPath.documentId(), 'in', ids)
-            .select()   // fetch no fields, only IDs — fastest possible
             .get()
         ));
         results.forEach(snap => snap.docs.forEach(d => existingSet.add(d.id)));
