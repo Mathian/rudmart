@@ -1187,10 +1187,11 @@ async function openMyOrders() {
   try {
     const snap = await db.collection('orders')
       .where('uid', '==', STATE.uid)
-      .orderBy('createdAt', 'desc')
       .limit(50)
       .get();
-    const orders = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    const orders = snap.docs
+      .map(d => ({ id: d.id, ...d.data() }))
+      .sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
     renderMyOrders(orders);
   } catch (e) {
     if (list) list.innerHTML = '<div style="text-align:center;padding:40px 0;color:var(--text3)">Ошибка загрузки</div>';
