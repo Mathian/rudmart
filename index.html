@@ -2,413 +2,529 @@
 <html lang="ru">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#0a0a0a">
 <title>RudMart</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
 <link rel="stylesheet" href="css/app.css">
 </head>
 <body>
 
-<div class="loading-overlay" id="loading-overlay"><div class="spin"></div></div>
+<!-- ===================== LOADING OVERLAY ===================== -->
+<div id="loading-overlay"><div class="spinner"></div></div>
 
-<!-- ==================== SPLASH ==================== -->
+<!-- ===================== TOAST ===================== -->
+<div id="toast" class="toast"></div>
+
+<!-- ================================================================
+     SPLASH
+     ================================================================ -->
 <div class="screen active" id="s-splash">
-  <div class="splash-logo">
-    <img src="RudMart - 2.png" alt="RudMart" onerror="this.parentElement.innerHTML='RM'">
+  <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;background:radial-gradient(ellipse at 50% 35%,rgba(166,0,0,.18) 0%,transparent 65%),var(--bg)">
+    <div class="splash-logo">
+      <img src="../RudMart - 1.png" alt="RudMart">
+    </div>
+    <div class="splash-name">RudMart</div>
+    <div class="splash-sub">Онлайн-супермаркет</div>
+    <div class="loader-dots">
+      <div class="dot"></div><div class="dot"></div><div class="dot"></div>
+    </div>
   </div>
-  <div class="splash-name">RudMart</div>
-  <div class="splash-sub">Онлайн супермаркет</div>
-  <div class="loader-dots"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>
 </div>
 
-<!-- ==================== NO-UID ==================== -->
+<!-- ================================================================
+     NO UID
+     ================================================================ -->
 <div class="screen" id="s-no-uid">
-  <div class="no-uid-icon">🔐</div>
-  <div class="no-uid-title">Откройте через бот</div>
-  <div class="no-uid-sub">
-    Используйте персональную ссылку из бота.<br><br>
-    Напишите боту <strong>/start</strong> чтобы получить её.
+  <div class="nouid-icon">🔐</div>
+  <div class="nouid-title">Откройте через Telegram-бот</div>
+  <div class="nouid-sub">
+    Для входа используйте персональную ссылку,<br>
+    которую вам отправил бот RudMart.<br><br>
+    Напишите боту <strong>/start</strong> для получения ссылки.
   </div>
 </div>
 
-<!-- ==================== REGISTRATION ==================== -->
+<!-- ================================================================
+     REGISTRATION
+     ================================================================ -->
 <div class="screen" id="s-register">
-  <div class="scroll"><div class="reg-wrap">
+  <div class="reg-wrap">
     <div class="reg-logo">
-      <div class="reg-logo-img">
-        <img src="RudMart - 2.png" alt="RudMart" onerror="this.style.display='none'">
-      </div>
+      <img src="../RudMart - 1.png" alt="RudMart">
       <h2>Добро пожаловать!</h2>
-      <p>Заполните данные для оформления заказов</p>
+      <p>Заполните данные для заказов</p>
     </div>
 
-    <!-- Personal info -->
-    <div class="reg-section">
-      <div class="reg-section-title">Ваши данные</div>
-      <div class="inp-wrap">
-        <div class="inp-label">Имя</div>
-        <input class="inp" id="reg-name" type="text" placeholder="Ваше имя">
+    <div class="reg-section">Личные данные</div>
+    <div class="fgroup">
+      <div class="field">
+        <label>Ваше имя</label>
+        <input id="reg-name" type="text" placeholder="Как вас зовут?" autocomplete="given-name">
       </div>
-      <div class="inp-wrap">
-        <div class="inp-label">Номер телефона</div>
-        <div class="field-rel">
-          <input class="inp" id="reg-phone" type="tel" readonly>
-          <span class="phone-lock-icon">🔒</span>
-        </div>
-      </div>
-    </div>
-
-    <!-- Delivery address -->
-    <div class="reg-section">
-      <div class="reg-section-title">Адрес доставки</div>
-      <div class="inp-wrap">
-        <div class="inp-label">Улица</div>
-        <input class="inp" id="reg-street" type="text" placeholder="ул. Ленина">
-      </div>
-      <div style="display:flex;gap:10px">
-        <div class="inp-wrap" style="flex:1">
-          <div class="inp-label">Дом</div>
-          <input class="inp" id="reg-house" type="text" placeholder="1А">
-        </div>
-        <div class="inp-wrap" style="flex:1">
-          <div class="inp-label">Квартира</div>
-          <input class="inp" id="reg-apt" type="text" placeholder="42">
-        </div>
-      </div>
-      <label class="cb-row" onclick="toggleRegIntercom()">
-        <div class="cb-box" id="reg-intercom-cb"></div>
-        <div>
-          <div class="cb-label">Есть домофон</div>
-          <div style="font-size:11px;color:var(--text3)">Код домофона уточним при заказе</div>
-        </div>
-      </label>
-    </div>
-
-    <button class="btn btn-red" id="btn-reg-submit" onclick="submitRegistration()">
-      Продолжить →
-    </button>
-  </div></div>
-</div>
-
-<!-- ==================== CONSENT ==================== -->
-<div class="screen" id="s-consent">
-  <div class="scroll"><div class="consent-wrap">
-    <div class="consent-icon">📋</div>
-    <div class="consent-title">Условия использования</div>
-    <div class="consent-sub">Ознакомьтесь и примите публичную оферту для начала покупок</div>
-
-    <div class="offer-card" id="offer-card" onclick="toggleConsentOffer()">
-      <span class="offer-card-icon">📄</span>
-      <div class="offer-card-title">Публичная оферта RudMart</div>
-      <div class="offer-card-sub">Условия покупки и доставки</div>
-      <a class="offer-card-link" id="offer-read-link" href="#" onclick="openOffer(event)">Читать →</a>
-      <div class="offer-cb" id="offer-cb"></div>
-    </div>
-
-    <div style="font-size:12px;color:var(--text3);text-align:center;margin:16px 0;">
-      Нажимая «Принять», вы соглашаетесь с условиями публичной оферты
-    </div>
-
-    <button class="btn btn-red" id="btn-consent-submit" onclick="submitConsent()" disabled>
-      Принять и начать 🛒
-    </button>
-  </div></div>
-</div>
-
-<!-- ==================== MAIN APP ==================== -->
-<div class="screen" id="s-main">
-  <div class="main-body">
-
-    <!-- ===== SHOP TAB ===== -->
-    <div class="tab-pane active" id="tab-shop">
-
-      <!-- Search bar -->
-      <div class="search-bar">
-        <div class="search-inp-wrap">
-          <span class="search-ico">🔍</span>
-          <input class="search-inp" id="search-inp" type="text" placeholder="Поиск товаров..."
-            oninput="onSearchInput(this.value)">
-          <span class="search-clear" id="search-clear" onclick="clearSearch()">✕</span>
-        </div>
-      </div>
-
-      <!-- Shop home content (hidden when searching) -->
-      <div id="shop-home">
-        <!-- Banners -->
-        <div id="banners-section">
-          <div class="banners-wrap" id="banners-wrap">
-            <div class="banners-track" id="banners-track"></div>
-          </div>
-          <div class="banner-dots" id="banner-dots"></div>
-        </div>
-
-        <!-- Categories -->
-        <div class="sec-hdr">
-          <div class="sec-title">Категории</div>
-        </div>
-        <div class="cat-grid" id="cat-grid"></div>
-
-        <!-- Best offers -->
-        <div id="best-offers-section">
-          <div class="sec-hdr">
-            <div class="sec-title">Лучшие предложения</div>
-          </div>
-          <div class="hscroll-wrap" id="best-offers-track"></div>
-        </div>
-      </div>
-
-      <!-- Category view -->
-      <div id="shop-category" style="display:none">
-        <div class="cat-page-hdr">
-          <button class="cat-back" onclick="backToShopHome()">←</button>
-          <div class="cat-page-name" id="cat-page-name"></div>
-        </div>
-        <div class="prod-grid" id="cat-products-grid" style="padding:10px 14px"></div>
-        <div id="cat-load-more" style="padding:16px;text-align:center;display:none">
-          <button class="btn btn-ghost btn-sm" onclick="loadMoreCategory()">Загрузить ещё</button>
-        </div>
-      </div>
-
-      <!-- Search results -->
-      <div id="shop-search" style="display:none">
-        <div class="search-results">
-          <div class="search-results-hdr" id="search-results-hdr"></div>
-          <div class="prod-grid" id="search-products-grid"></div>
+      <div class="field">
+        <label>Номер телефона</label>
+        <div style="position:relative">
+          <input id="reg-phone" type="tel" placeholder="+7…" readonly>
+          <span id="phone-lock" class="phone-lock" style="display:none">🔒</span>
         </div>
       </div>
     </div>
 
-    <!-- ===== FAVORITES TAB ===== -->
-    <div class="tab-pane" id="tab-fav">
-      <div class="fav-hdr">Избранное</div>
-      <div id="fav-empty" class="fav-empty" style="display:none">
-        <div class="fav-empty-ico">🤍</div>
-        <div class="fav-empty-text">Список пуст</div>
-        <div class="fav-empty-sub">Нажмите ♡ на карточке товара, чтобы добавить в избранное</div>
+    <div class="reg-section">Адрес доставки</div>
+    <div class="fgroup">
+      <div class="field">
+        <label>Улица</label>
+        <input id="reg-street" type="text" placeholder="ул. Ленина" autocomplete="street-address">
       </div>
-      <div class="prod-grid" id="fav-grid" style="padding:0 14px"></div>
-    </div>
-
-    <!-- ===== CART TAB ===== -->
-    <div class="tab-pane" id="tab-cart">
-      <div class="cart-user-hdr">
-        <div class="cart-user-name" id="cart-user-name">Корзина</div>
-        <button class="cart-settings-btn" onclick="openProfile()">⚙️</button>
-      </div>
-
-      <div id="cart-empty" class="cart-empty" style="display:none">
-        <div class="cart-empty-ico">🛒</div>
-        <div class="cart-empty-text">Корзина пуста</div>
-        <div class="cart-empty-sub">Добавьте товары из каталога и они появятся здесь</div>
-      </div>
-
-      <div id="cart-content">
-        <!-- Cart items rendered here -->
-        <div class="cart-items" id="cart-items-list"></div>
-
-        <!-- Club card toggle -->
-        <div class="cart-bottom" id="cart-bottom">
-          <div class="cart-club-row">
-            <div>
-              <div class="club-card-label">Клубная карта</div>
-              <div class="club-card-sub">Скидка по карте постоянного покупателя</div>
-            </div>
-            <label class="cb-row" style="padding:0" onclick="toggleClubCard()">
-              <div class="cb-box" id="cart-club-cb"></div>
-            </label>
-          </div>
-
-          <!-- Totals -->
-          <div class="cart-totals" id="cart-totals">
-            <div class="cart-total-row">
-              <span>Выбрано товаров</span>
-              <span class="val" id="ct-count">0</span>
-            </div>
-            <div class="cart-total-row">
-              <span>Сумма</span>
-              <span class="val" id="ct-sum">0 ₸</span>
-            </div>
-            <div class="cart-total-row hidden" id="ct-club-row">
-              <span>По клубной карте</span>
-              <span class="val text-red" id="ct-club-sum">0 ₸</span>
-            </div>
-            <div class="cart-total-row saved hidden" id="ct-saved-row">
-              <span>Экономия</span>
-              <span id="ct-saved">0 ₸</span>
-            </div>
-            <div class="cart-total-row main">
-              <span>Итого</span>
-              <span id="ct-total">0 ₸</span>
-            </div>
-          </div>
-
-          <div class="cart-delivery-note">
-            <span>🚚</span>
-            <span>Доставка оплачивается отдельно — <span id="delivery-price-label">500 ₸</span></span>
-          </div>
-
-          <button class="btn btn-red" id="btn-checkout" onclick="openCheckout()">
-            Оформить заказ
-          </button>
+      <div class="frow">
+        <div class="field">
+          <label>Дом</label>
+          <input id="reg-house" type="text" placeholder="12" style="max-width:100%">
+        </div>
+        <div class="field">
+          <label>Квартира</label>
+          <input id="reg-apt" type="text" placeholder="45">
         </div>
       </div>
+      <div class="cb-row">
+        <input type="checkbox" id="reg-intercom">
+        <label for="reg-intercom">Есть домофон</label>
+      </div>
     </div>
 
-  </div><!-- /main-body -->
-
-  <!-- Bottom navigation -->
-  <div class="bnav">
-    <button class="ni on" id="ni-shop" onclick="switchTab('shop')">
-      <span class="ni-ico">🏪</span>
-      <span class="ni-lbl">Магазин</span>
-    </button>
-    <button class="ni" id="ni-fav" onclick="switchTab('fav')">
-      <span class="ni-ico">🤍</span>
-      <span class="ni-lbl">Избранное</span>
-      <span class="ni-badge hidden" id="fav-badge">0</span>
-    </button>
-    <button class="ni" id="ni-cart" onclick="switchTab('cart')">
-      <span class="ni-ico">🛒</span>
-      <span class="ni-lbl">Корзина</span>
-      <span class="ni-badge hidden" id="cart-badge">0</span>
-    </button>
+    <div style="margin-top:8px">
+      <button class="btn btn-red" onclick="submitRegistration()">Продолжить →</button>
+    </div>
   </div>
+</div>
+
+<!-- ================================================================
+     CONSENT
+     ================================================================ -->
+<div class="screen" id="s-consent">
+  <div class="consent-wrap">
+    <div class="consent-header">
+      <div class="ico">📋</div>
+      <h2>Публичная оферта</h2>
+      <p>Для использования сервиса необходимо ознакомиться и принять условия публичной оферты</p>
+    </div>
+
+    <div class="consent-box">
+      <p>
+        Нажимая «Принять», вы подтверждаете, что ознакомились с условиями
+        <a id="offer-link" href="#" class="consent-offer-link" onclick="event.preventDefault();openOfferLink()">
+          публичной оферты
+        </a>
+        и принимаете их в полном объёме. Соглашение заключается между вами и магазином RudMart.
+      </p>
+    </div>
+
+    <div class="cb-row" style="padding:16px 0">
+      <input type="checkbox" id="consent-cb">
+      <label for="consent-cb">Я ознакомился(-ась) и принимаю условия публичной оферты</label>
+    </div>
+
+    <div class="consent-footer">
+      <button class="btn btn-red" onclick="submitConsent()">Принять и начать 🚀</button>
+    </div>
+  </div>
+</div>
+
+<!-- ================================================================
+     MAIN SCREEN
+     ================================================================ -->
+<div class="screen" id="s-main">
+
+  <!-- ============ SHOP TAB ============ -->
+  <div class="tab-content" id="tab-shop">
+
+    <!-- Header + Search -->
+    <div class="shop-header">
+      <div class="shop-brand">
+        <img src="../RudMart - 1.png" alt="RudMart">
+      </div>
+      <div class="search-wrap">
+        <div class="search-inp-wrap">
+          <span class="search-ico-left">🔍</span>
+          <input class="search-inp" id="search-inp" type="search" placeholder="Поиск товаров…"
+            oninput="onSearchInput(this.value)"
+            onkeydown="if(event.key==='Enter'){performSearch();this.blur()}"
+            onblur="closeDropdown()">
+          <button class="search-clear" id="search-clear" onclick="clearSearch()">✕</button>
+        </div>
+        <!-- Search dropdown -->
+        <div class="search-dropdown" id="search-dropdown"></div>
+      </div>
+    </div>
+
+    <!-- Banner Slider -->
+    <div id="banners-wrap" class="banners-wrap">
+      <div class="banners-scroll" id="banners-scroll"></div>
+      <div class="banner-dots" id="banner-dots"></div>
+    </div>
+
+    <!-- Categories -->
+    <div class="section-hdr">
+      <h3>Категории</h3>
+    </div>
+    <div class="cats-grid" id="cats-grid"></div>
+
+    <!-- Best Offers -->
+    <div id="best-offers-section">
+      <div class="section-hdr" style="margin-top:4px">
+        <h3>Лучшие предложения</h3>
+      </div>
+      <div class="offers-scroll" id="offers-scroll">
+        <div style="padding:10px;color:var(--text3);font-size:13px">Загрузка…</div>
+      </div>
+    </div>
+
+    <div style="height:20px"></div>
+  </div><!-- /tab-shop -->
+
+  <!-- ============ FAVORITES TAB ============ -->
+  <div class="tab-content" id="tab-favorites">
+    <div class="fav-header">
+      <h2>❤️ Избранное</h2>
+    </div>
+    <div id="fav-grid" style="flex:1"></div>
+  </div>
+
+  <!-- ============ CART TAB ============ -->
+  <div class="tab-content" id="tab-cart">
+    <div class="cart-header">
+      <div class="cart-user-name" id="cart-user-name">Гость</div>
+      <button class="cart-settings-btn" onclick="openProfile()" title="Настройки профиля">⚙️</button>
+    </div>
+
+    <div class="cart-items" id="cart-items"></div>
+
+    <div id="cart-totals-section" style="display:none">
+      <!-- Club card -->
+      <div class="cart-club-row">
+        <div class="cart-club-ico">🎫</div>
+        <div class="cart-club-txt">
+          <div class="cart-club-lbl">Клубная карта</div>
+          <div class="cart-club-sub">Скидки для держателей</div>
+        </div>
+        <input type="checkbox" id="club-card-cb" onchange="toggleClubCard()">
+      </div>
+
+      <div class="cart-total-box" style="margin-top:10px">
+        <div class="cart-total-row">
+          <span class="cart-total-lbl">Сумма</span>
+          <span class="cart-total-val" id="cart-total-val">0 ₸</span>
+        </div>
+        <div class="cart-total-row" id="cart-club-total-row" style="display:none">
+          <span class="cart-total-lbl">По клубной карте</span>
+          <span class="cart-total-club" id="cart-total-club"></span>
+        </div>
+        <div class="cart-total-row" id="cart-save-row" style="display:none">
+          <span class="cart-total-lbl text-green">Экономия</span>
+          <span class="cart-total-save" id="cart-save-val"></span>
+        </div>
+        <div class="cart-total-row" style="border-top:1px solid var(--border);padding-top:8px;margin-top:4px">
+          <span class="cart-total-lbl fw8">Итого (с доставкой)</span>
+          <span class="cart-total-main" id="cart-final-val">0 ₸</span>
+        </div>
+      </div>
+
+      <div class="cart-delivery-note">
+        🚚 Стоимость доставки: <strong id="delivery-cost-lbl">500 ₸</strong>. Оплачивается отдельно при получении.
+      </div>
+
+      <div class="cart-actions">
+        <button class="btn btn-red" id="cart-order-btn" onclick="openCheckout()" disabled>
+          Оформить заказ →
+        </button>
+      </div>
+    </div>
+
+    <div style="height:20px"></div>
+  </div><!-- /tab-cart -->
+
+  <!-- Bottom Nav -->
+  <nav class="bottom-nav">
+    <button class="nav-btn" data-tab="shop" onclick="switchTab('shop')">
+      <div class="nav-ico">🛒</div>
+      <div class="nav-lbl">Магазин</div>
+    </button>
+    <button class="nav-btn" data-tab="favorites" onclick="switchTab('favorites')">
+      <div class="nav-ico">❤️</div>
+      <div class="nav-lbl">Избранное</div>
+    </button>
+    <button class="nav-btn" data-tab="cart" onclick="switchTab('cart')">
+      <div class="nav-ico">
+        🛍️
+        <div class="nav-badge cart-badge" style="display:none">0</div>
+      </div>
+      <div class="nav-lbl">Корзина</div>
+    </button>
+  </nav>
 </div><!-- /s-main -->
 
-<!-- ==================== PRODUCT DETAIL MODAL ==================== -->
-<div class="modal-overlay" id="overlay-product" onclick="closeProductModal()"></div>
-<div class="modal-sheet" id="modal-product">
-  <div class="modal-drag"></div>
-  <div class="modal-scroll">
-    <div class="pd-img" id="pd-img">
-      <div class="pd-img-ph" id="pd-img-ph">📦</div>
-      <button class="pd-close" onclick="closeProductModal()">✕</button>
-      <button class="pd-fav-btn" id="pd-fav-btn" onclick="toggleFavFromModal()">🤍</button>
-      <span class="badge-promo hidden" id="pd-promo-badge">АКЦИЯ</span>
-    </div>
-    <div class="pd-body">
-      <div class="pd-availability" id="pd-avail"></div>
-      <div class="pd-name" id="pd-name"></div>
-      <div class="pd-prices">
-        <div class="pd-price" id="pd-price"></div>
-        <div class="pd-club-block hidden" id="pd-club-block">
-          <span class="pd-club-badge">КК</span>
-          <span class="pd-club-price" id="pd-club-price"></span>
-        </div>
-        <div class="pd-promo-orig hidden" id="pd-promo-orig"></div>
-      </div>
-      <div class="pd-chars hidden" id="pd-chars">
-        <div class="pd-chars-title">Характеристики</div>
-        <div id="pd-chars-list"></div>
-      </div>
-      <div class="pd-qty-row">
-        <button class="pd-qty-btn" onclick="changePdQty(-1)">−</button>
-        <span class="pd-qty-num" id="pd-qty">1</span>
-        <button class="pd-qty-btn" onclick="changePdQty(1)">+</button>
-      </div>
-      <button class="btn btn-red" id="pd-add-btn" onclick="addFromModal()">В корзину</button>
-    </div>
+<!-- ================================================================
+     CATEGORY PRODUCTS SCREEN
+     ================================================================ -->
+<div class="screen" id="s-category">
+  <div class="cat-screen-hdr">
+    <button class="back-btn" onclick="closeCatScreen()">←</button>
+    <div class="cat-screen-title" id="cat-screen-title">Категория</div>
+  </div>
+  <div class="cat-products scroll-view" id="cat-products-list"></div>
+  <div class="load-more-wrap" id="cat-load-more" style="display:none">
+    <button class="btn btn-out btn-sm" onclick="loadCategoryProducts()">Загрузить ещё</button>
   </div>
 </div>
 
-<!-- ==================== CHECKOUT MODAL ==================== -->
-<div class="modal-overlay" id="overlay-checkout" onclick="closeCheckout()"></div>
-<div class="modal-sheet" id="modal-checkout" style="max-height:95vh">
-  <div class="modal-drag"></div>
+<!-- ================================================================
+     SEARCH RESULTS SCREEN
+     ================================================================ -->
+<div class="screen" id="s-search">
+  <div class="search-res-hdr">
+    <button class="back-btn" onclick="closeSearchScreen()">←</button>
+    <div class="search-res-query" id="search-res-query">Результаты</div>
+  </div>
+  <div class="search-res-count" id="search-res-count"></div>
+  <div class="scroll-view" id="search-res-grid"></div>
+</div>
+
+<!-- ================================================================
+     PRODUCT DETAIL SCREEN
+     ================================================================ -->
+<div class="screen" id="s-product">
+  <div class="prod-detail-hdr">
+    <button class="back-btn" onclick="closeProductScreen()">←</button>
+    <div class="prod-detail-hdr-title" id="pd-name-hdr">Товар</div>
+  </div>
+  <div class="prod-detail-scroll">
+    <div class="prod-detail-img" id="pd-image">🛒</div>
+    <div class="prod-detail-name" id="pd-name"></div>
+    <div class="prod-detail-avail" id="pd-avail"></div>
+    <div class="prod-detail-prices" id="pd-prices"></div>
+
+    <div id="pd-chars">
+      <div class="prod-chars-title">Характеристики</div>
+      <div class="prod-chars-grid" id="pd-chars-grid"></div>
+    </div>
+
+    <div style="height:20px"></div>
+  </div>
+  <div class="prod-detail-actions">
+    <button class="btn btn-out btn-sm" id="pd-fav-btn" style="flex:0 0 auto">🤍 В избранное</button>
+    <button class="btn btn-red" id="pd-cart-btn">+ В корзину</button>
+  </div>
+</div>
+
+<!-- ================================================================
+     PROFILE SCREEN
+     ================================================================ -->
+<div class="screen" id="s-profile">
+  <div class="profile-hdr">
+    <button class="back-btn" onclick="closeProfile()">←</button>
+    <h2>Профиль</h2>
+  </div>
+  <div class="profile-scroll">
+    <div class="profile-section">
+      <div class="profile-section-lbl">Личные данные</div>
+      <div class="field">
+        <label>Имя</label>
+        <input id="profile-name" type="text" placeholder="Ваше имя">
+      </div>
+      <div class="field" style="position:relative">
+        <label>Телефон</label>
+        <input id="profile-phone" type="tel" readonly>
+        <span class="phone-lock">🔒</span>
+      </div>
+    </div>
+
+    <div class="profile-section">
+      <div class="profile-section-lbl">Адрес доставки</div>
+      <div class="field">
+        <label>Улица</label>
+        <input id="profile-street" type="text" placeholder="ул. Ленина">
+      </div>
+      <div class="frow">
+        <div class="field">
+          <label>Дом</label>
+          <input id="profile-house" type="text" placeholder="12">
+        </div>
+        <div class="field">
+          <label>Квартира</label>
+          <input id="profile-apt" type="text" placeholder="45">
+        </div>
+      </div>
+      <div class="cb-row">
+        <input type="checkbox" id="profile-intercom">
+        <label for="profile-intercom">Есть домофон</label>
+      </div>
+    </div>
+
+    <div class="profile-section">
+      <div class="profile-section-lbl">Документы</div>
+      <div class="profile-link-row" onclick="openOfferLink()">
+        <span class="profile-link-lbl">📄 Публичная оферта</span>
+        <span class="profile-link-arr">→</span>
+      </div>
+    </div>
+
+    <button class="btn btn-red" onclick="saveProfile()">Сохранить</button>
+  </div>
+</div>
+
+<!-- ================================================================
+     CHECKOUT SCREEN
+     ================================================================ -->
+<div class="screen" id="s-checkout">
   <div class="checkout-hdr">
-    <button class="checkout-back" onclick="closeCheckout()">←</button>
-    <div class="checkout-title">Оформление заказа</div>
+    <button class="back-btn" onclick="closeCheckout()">←</button>
+    <h2>Оформление заказа</h2>
   </div>
-  <div class="checkout-body" id="checkout-body">
-    <!-- Filled dynamically -->
-  </div>
+  <div class="checkout-scroll">
+
+    <!-- Items summary -->
+    <div class="checkout-section">
+      <div class="checkout-section-lbl">Состав заказа</div>
+      <div class="checkout-items" id="checkout-items"></div>
+    </div>
+
+    <!-- Totals -->
+    <div class="checkout-section">
+      <div class="checkout-section-lbl">Стоимость</div>
+      <div class="checkout-total-box">
+        <div class="checkout-total-row">
+          <span style="font-size:13px;color:var(--text2)">Сумма</span>
+          <span style="font-size:13px;font-weight:700" id="co-total-reg"></span>
+        </div>
+        <div class="checkout-total-row" id="co-club-row" style="display:none">
+          <span style="font-size:13px;color:var(--text2)">По клубной карте</span>
+          <span style="font-size:13px;font-weight:700;color:var(--red2)" id="co-total-club"></span>
+        </div>
+        <div class="checkout-total-row" id="co-save-row" style="display:none">
+          <span style="font-size:13px;color:var(--green)">Скидка</span>
+          <span style="font-size:13px;font-weight:700;color:var(--green)" id="co-total-save"></span>
+        </div>
+        <div class="checkout-total-row">
+          <span style="font-size:13px;color:var(--text2)">Доставка</span>
+          <span style="font-size:13px;font-weight:700" id="co-total-delivery">500 ₸</span>
+        </div>
+        <div class="checkout-total-row" style="border-top:1px solid var(--border);padding-top:8px;margin-top:4px">
+          <span style="font-size:15px;font-weight:900">Итого</span>
+          <span style="font-size:17px;font-weight:900;color:var(--red2)" id="co-total-final"></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Address -->
+    <div class="checkout-section">
+      <div class="checkout-section-lbl">Адрес доставки</div>
+      <div class="field">
+        <label>Улица</label>
+        <input id="co-street" type="text" placeholder="ул. Ленина">
+      </div>
+      <div class="frow">
+        <div class="field">
+          <label>Дом</label>
+          <input id="co-house" type="text" placeholder="12">
+        </div>
+        <div class="field">
+          <label>Квартира</label>
+          <input id="co-apt" type="text" placeholder="45">
+        </div>
+      </div>
+      <div class="cb-row">
+        <input type="checkbox" id="co-intercom">
+        <label for="co-intercom">Есть домофон</label>
+      </div>
+    </div>
+
+    <!-- Payment -->
+    <div class="checkout-section">
+      <div class="checkout-section-lbl">Способ оплаты</div>
+      <div class="pay-grid">
+        <div class="pay-btn sel" data-method="cash" onclick="selectPayMethod('cash')">
+          <div class="pay-ico">💵</div>
+          <div class="pay-lbl">Наличные</div>
+        </div>
+        <div class="pay-btn" data-method="card" onclick="selectPayMethod('card')">
+          <div class="pay-ico">💳</div>
+          <div class="pay-lbl">Карта</div>
+        </div>
+      </div>
+
+      <!-- Cash extra -->
+      <div id="co-cash-extra" style="margin-top:12px">
+        <div class="field">
+          <label>С какой купюры приготовить сдачу?</label>
+          <input id="co-change-from" type="number" placeholder="Например: 5000">
+        </div>
+      </div>
+
+      <!-- Card extra -->
+      <div id="co-card-extra" style="display:none;margin-top:12px">
+        <div class="checkout-section-lbl">Банк карты</div>
+        <div class="bank-grid">
+          <button class="bank-btn" data-bank="Kaspi"     onclick="selectBank('Kaspi')">Kaspi</button>
+          <button class="bank-btn" data-bank="Halyk"     onclick="selectBank('Halyk')">Halyk</button>
+          <button class="bank-btn" data-bank="Alatau"    onclick="selectBank('Alatau')">Alatau</button>
+          <button class="bank-btn" data-bank="Eurasian"  onclick="selectBank('Eurasian')">Eurasian</button>
+          <button class="bank-btn" data-bank="Другой"    onclick="selectBank('Другой')">Другой</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Comment -->
+    <div class="checkout-section">
+      <div class="checkout-section-lbl">Комментарий</div>
+      <div class="field">
+        <textarea id="co-comment" placeholder="Дополнительные пожелания к заказу…" rows="3" style="resize:none"></textarea>
+      </div>
+    </div>
+
+  </div><!-- /checkout-scroll -->
+
   <div class="checkout-footer">
-    <button class="btn btn-red" id="btn-place-order" onclick="placeOrder()">Подтвердить заказ</button>
+    <button class="btn btn-red" onclick="confirmOrder()">Подтвердить заказ →</button>
   </div>
 </div>
 
-<!-- ==================== PROFILE MODAL ==================== -->
-<div class="modal-overlay" id="overlay-profile" onclick="closeProfile()"></div>
-<div class="modal-sheet" id="modal-profile" style="max-height:90vh">
-  <div class="modal-drag"></div>
-  <div class="profile-hdr">
-    <button class="profile-close" onclick="closeProfile()">←</button>
-    <div class="profile-title">Мой профиль</div>
-  </div>
-  <div class="profile-body" id="profile-body">
-    <div class="profile-avatar" id="profile-avatar">👤</div>
-    <div style="text-align:center;margin-bottom:20px">
-      <div style="font-size:16px;font-weight:800" id="profile-disp-name"></div>
-      <div style="font-size:13px;color:var(--text2)" id="profile-disp-phone"></div>
-    </div>
-    <!-- Edit name -->
-    <div class="profile-section">
-      <div class="reg-section-title">Имя</div>
-      <div class="inp-wrap">
-        <input class="inp" id="profile-name-inp" type="text" placeholder="Ваше имя">
+<!-- ================================================================
+     ORDER SUCCESS MODAL
+     ================================================================ -->
+<div class="modal-overlay" id="order-success-modal" onclick="if(event.target===this)closeOrderSuccess()">
+  <div class="modal-sheet">
+    <div style="text-align:center;padding:10px 0 20px">
+      <div style="font-size:56px;margin-bottom:16px">✅</div>
+      <div style="font-size:20px;font-weight:900;margin-bottom:8px">Заказ оформлен!</div>
+      <div style="font-size:13px;color:var(--text2);line-height:1.6;margin-bottom:4px">
+        Номер вашего заказа:
       </div>
-      <button class="btn btn-outline btn-sm" onclick="saveProfileName()">Сохранить имя</button>
-    </div>
-    <!-- Edit address -->
-    <div class="profile-section">
-      <div class="reg-section-title">Адрес доставки</div>
-      <div class="inp-wrap">
-        <div class="inp-label">Улица</div>
-        <input class="inp" id="profile-street" type="text" placeholder="ул. Ленина">
+      <div style="font-size:15px;font-weight:800;color:var(--red2);margin-bottom:16px" id="success-order-id"></div>
+      <div style="font-size:13px;color:var(--text2);line-height:1.7;margin-bottom:24px">
+        Наш оператор свяжется с вами для подтверждения заказа.
+        Стоимость доставки уточните при звонке.
       </div>
-      <div style="display:flex;gap:10px">
-        <div class="inp-wrap" style="flex:1">
-          <div class="inp-label">Дом</div>
-          <input class="inp" id="profile-house" type="text">
-        </div>
-        <div class="inp-wrap" style="flex:1">
-          <div class="inp-label">Квартира</div>
-          <input class="inp" id="profile-apt" type="text">
-        </div>
-      </div>
-      <label class="cb-row" onclick="toggleProfileIntercom()">
-        <div class="cb-box" id="profile-intercom-cb"></div>
-        <div class="cb-label">Есть домофон</div>
-      </label>
-      <button class="btn btn-outline btn-sm" style="margin-top:8px" onclick="saveProfileAddress()">Сохранить адрес</button>
-    </div>
-    <!-- Links -->
-    <div class="profile-section">
-      <div class="profile-link-row" onclick="openOffer(null)">
-        <span class="profile-link-label">📄 Публичная оферта</span>
-        <span class="profile-link-ico">→</span>
-      </div>
+      <button class="btn btn-red" onclick="closeOrderSuccess()">Отлично!</button>
     </div>
   </div>
 </div>
 
-<!-- ==================== OFFER MODAL ==================== -->
-<div class="modal-overlay" id="overlay-offer" onclick="closeOffer()"></div>
-<div class="modal-sheet" id="modal-offer" style="max-height:95vh">
-  <div class="modal-drag"></div>
-  <div class="profile-hdr">
-    <button class="profile-close" onclick="closeOffer()">←</button>
-    <div class="profile-title">Публичная оферта</div>
-  </div>
-  <div class="modal-scroll" style="padding:16px">
-    <div id="offer-content" style="font-size:13px;color:var(--text2);line-height:1.7">
-      Загрузка...
-    </div>
-  </div>
-</div>
-
-<!-- Toast -->
-<div class="toast" id="toast"></div>
-
-<!-- Scripts -->
+<!-- ================================================================
+     SCRIPTS
+     ================================================================ -->
 <script src="js/config.js"></script>
 <script src="js/db.js"></script>
+<script src="js/utils.js"></script>
 <script src="js/app.js"></script>
+
+<script>
+  // Set delivery cost label
+  document.getElementById('delivery-cost-lbl').textContent = DELIVERY_COST.toLocaleString('ru-RU') + ' ₸';
+</script>
 </body>
 </html>

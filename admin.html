@@ -2,368 +2,476 @@
 <html lang="ru">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Taxi Admin Panel</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/admin.css">
-<style>
-    /* Принудительно разрешаем ввод только на экране логина */
-    #login-screen .inp,
-    #login-screen input[type="text"],
-    #login-screen input[type="password"] {
-        pointer-events: auto !important;
-        cursor: text !important;
-        user-select: text !important;
-        -webkit-user-select: text !important;
-        -moz-user-select: text !important;
-        opacity: 1 !important;
-        background-color: #fff !important;   /* или var(--bg) / ваш цвет */
-        color: #000 !important;
-        border: 1px solid #ccc !important;
-    }
-
-    #login-screen .login-box {
-        pointer-events: auto !important;
-    }
-
-    /* Если есть overlay или что-то перекрывает */
-    #login-screen {
-        pointer-events: auto !important;
-    }
-</style>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#0a0a0a">
+<title>RudMart Admin</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<link rel="stylesheet" href="css/admin.css">
 </head>
 <body>
 
-<!-- LOGIN -->
-<div id="login-screen">
+<!-- ===================== LOADING ===================== -->
+<div id="loading-overlay"><div class="spinner"></div></div>
+<div id="toast" class="toast"></div>
+
+<!-- ================================================================
+     LOGIN SCREEN
+     ================================================================ -->
+<div class="screen active" id="s-login">
   <div class="login-box">
     <div class="login-logo">
-      <div style="font-size:36px;margin-bottom:8px">🚖</div>
-      <h1>TAXI ADMIN</h1>
+      <img src="../RudMart - 2.png" alt="RudMart" style="height:48px">
+      <h1 style="margin-top:10px">RudMart Admin</h1>
       <p>Панель управления</p>
     </div>
-    <input class="inp" type="text" id="login-user" placeholder="Логин" autocomplete="username">
-    <input class="inp" type="password" id="login-pass" placeholder="Пароль" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()">
-    <button class="btn btn-y" onclick="doLogin()">Войти →</button>
-    <div style="font-size:11px;color:var(--text3);text-align:center;margin-top:14px">Доступ только для администраторов</div>
+    <input class="inp" id="login-pwd" type="password" placeholder="Пароль"
+      onkeydown="if(event.key==='Enter')adminLogin()">
+    <button class="btn btn-red" onclick="adminLogin()">Войти →</button>
   </div>
 </div>
 
-<!-- Mobile header -->
-<div class="mob-header" id="mob-header" style="display:none">
-  <button class="burger" onclick="toggleSidebar()">☰</button>
-  <h2>🚖 TAXI ADMIN</h2>
-</div>
-<div class="sidebar-overlay" id="sidebar-overlay" onclick="toggleSidebar()"></div>
+<!-- ================================================================
+     MAIN SCREEN
+     ================================================================ -->
+<div class="screen" id="s-main">
 
-<!-- ADMIN PANEL -->
-<div id="admin-screen">
-  <div class="sidebar" id="sidebar">
-    <div class="sidebar-logo">
-      <h2>🚖 TAXI</h2>
-      <span>Администратор</span>
+  <!-- ============ ORDERS TAB ============ -->
+  <div class="tab-content" id="tab-orders">
+    <div class="page-hdr">
+      <div>
+        <h2>Заказы</h2>
+        <div class="page-hdr-sub">Управление входящими заказами</div>
+      </div>
     </div>
-    <button class="nav-item active" onclick="showPage('dashboard')" id="nav-dashboard"><span class="ico">📊</span> Дашборд</button>
-    <button class="nav-item" onclick="showPage('drivers')" id="nav-drivers"><span class="ico">🚗</span> Водители<span class="nav-badge" id="nav-pending-badge" style="display:none">0</span></button>
-    <button class="nav-item" onclick="showPage('passengers')" id="nav-passengers"><span class="ico">🧳</span> Пассажиры</button>
-    <button class="nav-item" onclick="showPage('orders')" id="nav-orders"><span class="ico">📋</span> Заказы</button>
-    <button class="nav-item" onclick="showPage('intercity')" id="nav-intercity"><span class="ico">🛣️</span> Межгород</button>
-    <button class="nav-item" onclick="showPage('support')" id="nav-support"><span class="ico">💬</span> Поддержка<span class="nav-badge" id="nav-support-badge" style="display:none">0</span></button>
-    <button class="nav-item" onclick="showPage('disputes')" id="nav-disputes"><span class="ico">⚔️</span> Диспуты<span class="nav-badge" id="nav-disputes-badge" style="display:none">0</span></button>
-    <button class="nav-item" onclick="showPage('settings')" id="nav-settings"><span class="ico">⚙️</span> Настройки</button>
-    <div style="padding:16px;margin-top:20px;border-top:1px solid var(--border)">
-      <button class="btn-sm btn-danger" style="width:100%;padding:8px" onclick="logout()">← Выйти</button>
+
+    <!-- Filters -->
+    <div class="orders-filter">
+      <button class="filter-chip active" data-filter="all"       onclick="setOrdersFilter('all')">Все</button>
+      <button class="filter-chip"        data-filter="new"       onclick="setOrdersFilter('new')">Новые</button>
+      <button class="filter-chip"        data-filter="accepted"  onclick="setOrdersFilter('accepted')">Принятые</button>
+      <button class="filter-chip"        data-filter="collected" onclick="setOrdersFilter('collected')">Собранные</button>
+      <button class="filter-chip"        data-filter="sent"      onclick="setOrdersFilter('sent')">Отправленные</button>
+      <button class="filter-chip"        data-filter="cancelled" onclick="setOrdersFilter('cancelled')">Отменённые</button>
     </div>
+
+    <div class="orders-list" id="orders-list">
+      <div style="text-align:center;padding:48px 20px;color:var(--text3);font-size:14px">Загрузка заказов…</div>
+    </div>
+  </div><!-- /tab-orders -->
+
+  <!-- ============ SHOP TAB ============ -->
+  <div class="tab-content" id="tab-shop">
+    <div class="page-hdr">
+      <div>
+        <h2>Товары</h2>
+        <div class="page-hdr-sub">Управление каталогом</div>
+      </div>
+    </div>
+
+    <!-- Search + controls -->
+    <div class="shop-hdr-bar">
+      <input class="shop-search" id="admin-search" type="search" placeholder="Поиск товара…"
+        oninput="_adminSearchDebounced(this.value)">
+      <button class="btn btn-sm btn-red" onclick="showImportModal()">📥 Импорт</button>
+      <button class="btn btn-sm btn-out" onclick="exportProducts()">📤 Экспорт</button>
+    </div>
+
+    <!-- Category filter -->
+    <div class="cat-filter" id="admin-cat-filter">
+      <button class="admin-cat-chip filter-chip active" data-cat="all" onclick="adminFilterCat('all')">Все</button>
+    </div>
+
+    <div class="admin-products-grid" id="admin-products-grid"></div>
+    <div class="load-more-wrap" id="admin-load-more" style="display:none">
+      <button class="btn btn-out btn-sm" onclick="loadAdminProducts(false)">Загрузить ещё</button>
+    </div>
+    <div style="height:20px"></div>
+  </div><!-- /tab-shop -->
+
+  <!-- ============ SETTINGS TAB ============ -->
+  <div class="tab-content" id="tab-settings">
+    <div class="page-hdr">
+      <h2>Настройки</h2>
+    </div>
+
+    <div class="settings-list">
+
+      <!-- General -->
+      <div class="settings-card">
+        <div class="settings-card-hdr">
+          <div>
+            <div class="settings-card-title">🌐 Общие</div>
+            <div class="settings-card-sub">Основные параметры магазина</div>
+          </div>
+        </div>
+        <div class="settings-row">
+          <span class="settings-row-lbl">Рекламные баннеры</span>
+          <label class="toggle">
+            <input type="checkbox" id="toggle-banners">
+            <div class="toggle-track"></div>
+            <div class="toggle-thumb"></div>
+          </label>
+        </div>
+        <div class="field" style="margin-top:12px">
+          <label>Ссылка на публичную оферту</label>
+          <input class="inp" id="settings-offer-url" type="url" placeholder="https://…">
+        </div>
+        <button class="btn btn-red" style="margin-top:8px" onclick="saveGeneralSettings()">Сохранить</button>
+      </div>
+
+      <!-- Banners -->
+      <div class="settings-card">
+        <div class="settings-card-hdr">
+          <div>
+            <div class="settings-card-title">🖼️ Баннеры</div>
+            <div class="settings-card-sub">Управление рекламными баннерами</div>
+          </div>
+        </div>
+        <div class="banner-manage-list" id="banners-list">
+          <div style="color:var(--text3);font-size:13px;padding:8px 0">Загрузка…</div>
+        </div>
+
+        <!-- Add banner -->
+        <div style="margin-top:16px;border-top:1px solid var(--border);padding-top:14px">
+          <div class="settings-card-sub" style="margin-bottom:10px">Добавить баннер</div>
+          <input class="inp" id="new-banner-title" type="text" placeholder="Название баннера" style="margin-bottom:8px">
+          <div class="img-upload-area" style="aspect-ratio:auto;height:80px;border-radius:var(--r2)"
+            onclick="document.getElementById('new-banner-file').click()">
+            <span class="upload-ico" style="font-size:22px">📷</span>
+            <span class="upload-txt" style="font-size:12px">Выбрать изображение</span>
+          </div>
+          <input type="file" id="new-banner-img" accept="image/*">
+          <button class="btn btn-sm btn-red" style="margin-top:8px" onclick="addBanner()">+ Добавить</button>
+        </div>
+      </div>
+
+      <!-- Password -->
+      <div class="settings-card">
+        <div class="settings-card-hdr">
+          <div>
+            <div class="settings-card-title">🔐 Безопасность</div>
+            <div class="settings-card-sub">Изменение пароля администратора</div>
+          </div>
+        </div>
+        <div class="field">
+          <label>Новый пароль</label>
+          <input class="inp" id="settings-admin-pwd" type="password" placeholder="Минимум 4 символа">
+        </div>
+        <button class="btn btn-sm btn-red" onclick="saveAdminPassword()">Сохранить пароль</button>
+      </div>
+
+      <!-- Logout -->
+      <button class="btn btn-out" onclick="adminLogout()" style="margin-top:4px">Выйти из аккаунта</button>
+    </div>
+
+    <div style="height:20px"></div>
+  </div><!-- /tab-settings -->
+
+  <!-- Bottom Nav -->
+  <nav class="bottom-nav">
+    <button class="nav-btn" data-tab="orders" onclick="switchAdminTab('orders')">
+      <div class="nav-ico">
+        📋
+        <div class="nav-badge" id="orders-nav-badge" style="display:none">0</div>
+      </div>
+      <div class="nav-lbl">Заказы</div>
+    </button>
+    <button class="nav-btn" data-tab="shop" onclick="switchAdminTab('shop')">
+      <div class="nav-ico">🏪</div>
+      <div class="nav-lbl">Магазин</div>
+    </button>
+    <button class="nav-btn" data-tab="settings" onclick="switchAdminTab('settings')">
+      <div class="nav-ico">⚙️</div>
+      <div class="nav-lbl">Настройки</div>
+    </button>
+  </nav>
+</div><!-- /s-main -->
+
+<!-- ================================================================
+     ORDER DETAIL SCREEN
+     ================================================================ -->
+<div class="screen" id="s-order-detail">
+  <div class="detail-hdr">
+    <button class="back-btn" onclick="closeOrderDetail()">←</button>
+    <div class="detail-hdr-title" id="od-id">Заказ</div>
+    <div class="order-status os-new" id="od-status" style="flex-shrink:0"></div>
   </div>
 
-  <div class="main-content">
+  <div class="detail-scroll">
 
-    <!-- DASHBOARD -->
-    <div class="page active" id="page-dashboard">
-      <div class="page-header">
-        <h1>Дашборд</h1>
-        <p id="dash-updated">Загрузка...</p>
-      </div>
-      <div class="stats-grid">
-        <div class="stat-card"><div class="sc-val" id="st-users">—</div><div class="sc-lbl">Пользователей</div></div>
-        <div class="stat-card"><div class="sc-val" id="st-drivers">—</div><div class="sc-lbl">Водителей</div></div>
-        <div class="stat-card"><div class="sc-val" id="st-online">—</div><div class="sc-lbl">Онлайн сейчас</div></div>
-        <div class="stat-card"><div class="sc-val" id="st-pending">—</div><div class="sc-lbl">Ожидают проверки</div></div>
-        <div class="stat-card"><div class="sc-val" id="st-orders-total">—</div><div class="sc-lbl">Заявок всего</div></div>
-        <div class="stat-card"><div class="sc-val" id="st-orders-done">—</div><div class="sc-lbl">Завершено всего</div></div>
-        <div class="stat-card"><div class="sc-val" id="st-earn-all" style="font-size:18px">—</div><div class="sc-lbl">Сумма всех заявок</div></div>
-        <div class="stat-card"><div class="sc-val" id="st-earn-done" style="font-size:18px">—</div><div class="sc-lbl">Сумма завершённых</div></div>
-        <div class="stat-card"><div class="sc-val" id="st-orders-today">—</div><div class="sc-lbl">Заявок сегодня</div></div>
-        <div class="stat-card"><div class="sc-val" id="st-orders-today-done">—</div><div class="sc-lbl">Завершено сегодня</div></div>
-        <div class="stat-card"><div class="sc-val" id="st-earn-today" style="font-size:18px">—</div><div class="sc-lbl">Сумма заявок сегодня</div></div>
-        <div class="stat-card"><div class="sc-val" id="st-earn-today-done" style="font-size:18px">—</div><div class="sc-lbl">Сумма завершённых сегодня</div></div>
-      </div>
-      <div id="dash-pending-section" style="display:none">
-        <div class="warn-box">⚠️ Есть водители ожидающие проверки! <button class="btn-sm btn-primary" onclick="showPage('drivers');filterDrivers('pending')" style="margin-left:8px">Проверить →</button></div>
-      </div>
-      <div class="table-wrap">
-        <div class="table-hdr"><h3>Последние заказы</h3><button class="btn-sm btn-view" onclick="showPage('orders')">Все заказы →</button></div>
-        <div class="table-scroll"><div id="dash-recent-orders"><div class="empty">Загрузка...</div></div></div>
-      </div>
-    </div>
-
-    <!-- DRIVERS -->
-    <div class="page" id="page-drivers">
-      <div class="page-header">
-        <h1>Водители</h1>
-        <p>Управление водителями и заявками на регистрацию</p>
-      </div>
-      <div class="info-box">ℹ️ Данные берутся из Firebase + localStorage пользователей. Нажмите "Обновить" если не видите новых заявок.</div>
-      <div class="filter-bar">
-        <div class="filter-chip on" onclick="filterDrivers('all')" id="df-all">Все</div>
-        <div class="filter-chip" onclick="filterDrivers('pending')" id="df-pending">⏳ Ожидают проверки</div>
-        <div class="filter-chip" onclick="filterDrivers('approved')" id="df-approved">✓ Активные</div>
-        <div class="filter-chip" onclick="filterDrivers('blocked')" id="df-blocked">✗ Заблокированы</div>
-        <button class="btn-sm btn-view" onclick="loadDrivers()">🔄 Обновить</button>
-      </div>
-      <div style="margin-bottom:12px">
-        <input class="inp" type="search" placeholder="🔍 Поиск по имени, телефону, городу..." oninput="searchDrivers(this.value)" style="max-width:380px;margin-bottom:0">
-      </div>
-      <div class="table-wrap">
-        <div class="table-scroll">
-          <table>
-            <thead><tr><th>Водитель</th><th>Телефон</th><th>Город</th><th>Авто</th><th>Рейтинг</th><th>Поездок</th><th>Статус</th><th>Подписка</th><th>Действия</th></tr></thead>
-            <tbody id="drivers-tbody"><tr><td colspan="9" class="empty">Загрузка...</td></tr></tbody>
-          </table>
+    <!-- Info -->
+    <div class="detail-section">
+      <div class="detail-section-lbl">Информация о заказе</div>
+      <div class="detail-info-box">
+        <div class="detail-info-row">
+          <span class="detail-info-lbl">Покупатель</span>
+          <span class="detail-info-val" id="od-user"></span>
+        </div>
+        <div class="detail-info-row">
+          <span class="detail-info-lbl">Телефон</span>
+          <span class="detail-info-val" id="od-phone"></span>
+        </div>
+        <div class="detail-info-row">
+          <span class="detail-info-lbl">Дата заказа</span>
+          <span class="detail-info-val" id="od-date"></span>
+        </div>
+        <div class="detail-info-row">
+          <span class="detail-info-lbl">Адрес</span>
+          <span class="detail-info-val" id="od-address"></span>
+        </div>
+        <div class="detail-info-row">
+          <span class="detail-info-lbl">Оплата</span>
+          <span class="detail-info-val" id="od-payment"></span>
+        </div>
+        <div class="detail-info-row">
+          <span class="detail-info-lbl">Комментарий</span>
+          <span class="detail-info-val" id="od-comment"></span>
+        </div>
+        <div class="detail-info-row">
+          <span class="detail-info-lbl" style="font-weight:800">Итого</span>
+          <span class="detail-info-val" id="od-total" style="color:var(--red2);font-size:15px"></span>
         </div>
       </div>
     </div>
 
-    <!-- PASSENGERS -->
-    <div class="page" id="page-passengers">
-      <div class="page-header">
-        <h1>Пассажиры</h1>
-        <p>Список зарегистрированных пользователей</p>
+    <!-- Items -->
+    <div class="detail-section">
+      <div class="detail-section-lbl" style="display:flex;justify-content:space-between;align-items:center">
+        <span>Позиции заказа</span>
+        <button class="btn btn-sm btn-ghost" onclick="saveOrderEdits()">💾 Сохранить изменения</button>
       </div>
-      <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;align-items:center">
-        <button class="btn-sm btn-view" onclick="loadPassengers()">🔄 Обновить</button>
-        <input class="inp" type="search" placeholder="🔍 Поиск по имени, телефону, городу..." oninput="searchPassengers(this.value)" style="flex:1;min-width:200px;max-width:380px;margin-bottom:0">
+      <div id="od-items"></div>
+    </div>
+
+    <div style="height:12px"></div>
+  </div>
+
+  <div class="order-actions" id="od-actions"></div>
+</div>
+
+<!-- ================================================================
+     EDIT PRODUCT SCREEN
+     ================================================================ -->
+<div class="screen" id="s-edit-product">
+  <div class="detail-hdr">
+    <button class="back-btn" onclick="closeEditProduct()">←</button>
+    <div class="detail-hdr-title" id="ep-title">Редактировать</div>
+  </div>
+
+  <div class="edit-prod-scroll">
+
+    <!-- Image -->
+    <div class="detail-section">
+      <div class="detail-section-lbl">Фото товара</div>
+      <div class="img-upload-area" id="ep-img-wrap" onclick="document.getElementById('ep-img-input').click()">
+        <img id="ep-img-preview" src="" style="display:none">
+        <span class="upload-ico">📷</span>
+        <span class="upload-txt">Нажмите для загрузки фото (макс. 5 МБ)</span>
       </div>
-      <div class="table-wrap">
-        <div class="table-scroll">
-          <table>
-            <thead><tr><th>Имя</th><th>Телефон</th><th>Город</th><th>Рейтинг</th><th>Поездок</th><th>Зарег.</th><th>Действия</th></tr></thead>
-            <tbody id="passengers-tbody"><tr><td colspan="7" class="empty">Загрузка...</td></tr></tbody>
-          </table>
-        </div>
+      <input type="file" id="ep-img-input" accept="image/*" onchange="uploadProductImage()">
+      <div class="progress-track" style="margin-top:6px;display:none">
+        <div class="progress-fill" id="ep-upload-progress"></div>
       </div>
     </div>
 
-    <!-- ORDERS -->
-    <div class="page" id="page-orders">
-      <div class="page-header">
-        <h1>Заказы</h1>
-        <p>Все заказы системы</p>
+    <!-- Main info -->
+    <div class="detail-section">
+      <div class="detail-section-lbl">Основное</div>
+      <div class="field">
+        <label>Название</label>
+        <input id="ep-name" type="text" placeholder="Название товара">
       </div>
-      <div class="filter-bar">
-        <div class="filter-chip on" onclick="filterOrders('all')" id="of-all">Все</div>
-        <div class="filter-chip" onclick="filterOrders('searching')" id="of-searching">🔍 В поиске</div>
-        <div class="filter-chip" onclick="filterOrders('active')" id="of-active">🟢 Активные</div>
-        <div class="filter-chip" onclick="filterOrders('done')" id="of-done">✓ Завершены</div>
-        <div class="filter-chip" onclick="filterOrders('cancelled')" id="of-cancelled">✗ Отменены</div>
-        <button class="btn-sm btn-view" onclick="loadOrders()">🔄 Обновить</button>
-      </div>
-      <div style="margin-bottom:12px">
-        <input class="inp" type="search" placeholder="🔍 Поиск по телефону пассажира, водителя, имени или ID заказа..." oninput="searchOrders(this.value)" style="max-width:440px;margin-bottom:0">
-      </div>
-      <div class="table-wrap">
-        <div class="table-scroll">
-          <table>
-            <thead><tr><th>ID</th><th>Пассажир</th><th>Откуда</th><th>Куда</th><th>Цена</th><th>Тип оплаты</th><th>Статус</th><th>Водитель</th><th>Дата и время</th></tr></thead>
-            <tbody id="orders-tbody"><tr><td colspan="9" class="empty">Загрузка...</td></tr></tbody>
-          </table>
+      <div class="frow">
+        <div class="field">
+          <label>Цена (₸)</label>
+          <input id="ep-price" type="number" placeholder="0">
         </div>
+        <div class="field">
+          <label>Клуб. цена (₸)</label>
+          <input id="ep-club" type="number" placeholder="0">
+        </div>
+      </div>
+      <div class="frow">
+        <div class="field">
+          <label>Акц. цена (₸)</label>
+          <input id="ep-promo" type="number" placeholder="0">
+        </div>
+        <div class="field">
+          <label>Остаток</label>
+          <input id="ep-stock" type="number" placeholder="0">
+        </div>
+      </div>
+      <div class="frow">
+        <div class="field">
+          <label>Начало акции</label>
+          <input id="ep-promo-start" type="date">
+        </div>
+        <div class="field">
+          <label>Конец акции</label>
+          <input id="ep-promo-end" type="date">
+        </div>
+      </div>
+      <div class="cb-row">
+        <input type="checkbox" id="ep-best-offer">
+        <label for="ep-best-offer">⭐ Лучшее предложение</label>
       </div>
     </div>
 
-    <!-- INTERCITY -->
-    <div class="page" id="page-intercity">
-      <div class="page-header">
-        <h1>Межгородние заявки</h1>
-        <p>Заявки на межгородние поездки</p>
-      </div>
-      <div class="table-wrap">
-        <div class="table-scroll">
-          <table>
-            <thead><tr><th>ID</th><th>Пассажир</th><th>Откуда → Куда</th><th>Дата/Время</th><th>Тип</th><th>Цена</th><th>Статус</th><th>Звонков</th></tr></thead>
-            <tbody id="intercity-tbody"><tr><td colspan="8" class="empty">Загрузка...</td></tr></tbody>
-          </table>
+    <!-- Category -->
+    <div class="detail-section">
+      <div class="detail-section-lbl">Категория</div>
+      <div class="category-select-wrap" id="ep-category-chips"></div>
+    </div>
+
+    <!-- Characteristics -->
+    <div class="detail-section">
+      <div class="detail-section-lbl">Характеристики</div>
+      <div class="frow">
+        <div class="field">
+          <label>Бренд</label>
+          <input id="ep-brand" type="text" placeholder="Название бренда">
         </div>
+        <div class="field">
+          <label>Объём (л/мл)</label>
+          <input id="ep-volume" type="text" placeholder="1л / 500мл">
+        </div>
+      </div>
+      <div class="frow">
+        <div class="field">
+          <label>Масса (кг/г)</label>
+          <input id="ep-mass" type="text" placeholder="1кг / 250г">
+        </div>
+        <div class="field">
+          <label>Жирность (%)</label>
+          <input id="ep-fat" type="number" step="0.1" placeholder="2.5">
+        </div>
+      </div>
+      <div class="frow">
+        <div class="field">
+          <label>Крепость (%)</label>
+          <input id="ep-alcohol" type="number" step="0.1" placeholder="0">
+        </div>
+        <div class="field">
+          <label>Белки (100г)</label>
+          <input id="ep-protein" type="number" step="0.1" placeholder="0">
+        </div>
+      </div>
+      <div class="frow">
+        <div class="field">
+          <label>Жиры (100г)</label>
+          <input id="ep-fat100" type="number" step="0.1" placeholder="0">
+        </div>
+        <div class="field">
+          <label>Углеводы (100г)</label>
+          <input id="ep-carbs" type="number" step="0.1" placeholder="0">
+        </div>
+      </div>
+      <div class="cb-row">
+        <input type="checkbox" id="ep-carbonated">
+        <label for="ep-carbonated">Газированный</label>
       </div>
     </div>
 
-    <!-- SUPPORT -->
-    <div class="page" id="page-support">
-      <div class="page-header">
-        <h1>Поддержка</h1>
-        <p>Чаты с пользователями</p>
-      </div>
-      <div class="chat-layout">
-        <div class="chat-list" id="support-chat-list"><div class="empty" style="padding:20px">Загрузка...</div></div>
-        <div class="chat-area">
-          <div class="chat-area-mob-hdr" id="chat-area-mob-hdr" style="display:none">
-            <button class="chat-back-btn" onclick="closeMobileChat()">← Назад</button>
-            <span class="chat-area-mob-title" id="chat-area-mob-title">Чат</span>
-          </div>
-          <div class="chat-msgs-admin" id="admin-chat-msgs">
-            <div style="text-align:center;color:var(--text3);padding:40px;font-size:13px">Выберите чат слева</div>
-          </div>
-          <div class="chat-input-area" id="chat-input-area" style="display:none">
-            <input class="chat-input-admin" id="admin-chat-input" placeholder="Ответить..." onkeydown="if(event.key==='Enter')adminSendMsg()">
-            <button class="chat-send-btn" onclick="adminSendMsg()">➤</button>
-          </div>
-        </div>
-      </div>
-    </div>
+    <div style="height:16px"></div>
+  </div>
 
-    <!-- SETTINGS -->
-    <!-- DISPUTES -->
-    <div class="page" id="page-disputes">
-      <div class="page-header">
-        <h1>Диспуты</h1>
-        <p>Спорные ситуации между пассажирами и водителями</p>
-      </div>
-      <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;align-items:center">
-        <button class="btn-sm btn-primary" onclick="filterDisputes('pending')">⏳ Ожидают решения</button>
-        <button class="btn-sm btn-view" onclick="filterDisputes('all')">Все</button>
-        <button class="btn-sm btn-view" onclick="filterDisputes('resolved')">✓ Решённые</button>
-        <button class="btn-sm btn-view" style="margin-left:auto" onclick="loadDisputes()">🔄 Обновить</button>
-      </div>
-      <div style="margin-bottom:16px">
-        <input class="inp" type="search" placeholder="🔍 Поиск по номеру диспута, телефону или имени участника..." oninput="searchDisputes(this.value)" style="max-width:440px;margin-bottom:0">
-      </div>
-      <div id="disputes-list">
-        <div class="empty-state" style="padding:32px;text-align:center;color:var(--text3)">Загрузка...</div>
-      </div>
-    </div>
-
-    <div class="page" id="page-settings">
-      <div class="page-header">
-        <h1>Настройки системы</h1>
-        <p>Управление функциями приложения</p>
-      </div>
-      <div class="settings-grid" style="margin-bottom:24px">
-        <div class="setting-card">
-          <div class="sc-info"><h4>🎁 Бонусная система</h4><p>30 поездок за смену = следующая смена бесплатно</p></div>
-          <div class="toggle" id="tog-bonus" onclick="toggleSetting('bonusSystem')"></div>
-        </div>
-        <div class="setting-card">
-          <div class="sc-info"><h4>🛣️ Межгород</h4><p>Показывать межгородние заявки водителям</p></div>
-          <div class="toggle on" id="tog-intercity" onclick="toggleSetting('intercity')"></div>
-        </div>
-        <div class="setting-card">
-          <div class="sc-info"><h4>📍 Трансляция геолокации</h4><p>Пассажиры могут транслировать геопозицию</p></div>
-          <div class="toggle on" id="tog-geo" onclick="toggleSetting('geoTracking')"></div>
-        </div>
-        <div class="setting-card">
-          <div class="sc-info"><h4>💰 Платный режим водителей</h4><p>Требовать оплату за смену после пробного периода</p></div>
-          <div class="toggle on" id="tog-paid" onclick="toggleSetting('paidShifts')"></div>
-        </div>
-      </div>
-      <div class="table-wrap">
-        <div class="table-hdr"><h3>Тарифы и параметры</h3></div>
-        <div style="padding:16px;display:flex;flex-direction:column;gap:12px">
-          <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
-            <span style="font-size:13px;font-weight:700;min-width:200px">Стоимость смены (тенге):</span>
-            <input class="inp" type="number" id="set-shift-price" value="500" style="width:120px;margin-bottom:0">
-            <button class="btn-sm btn-primary" onclick="saveShiftPrice()">Сохранить</button>
-          </div>
-          <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
-            <span style="font-size:13px;font-weight:700;min-width:200px">TON кошелёк для оплаты:</span>
-            <input class="inp" type="text" id="set-ton-wallet" placeholder="UQD..." style="flex:1;min-width:200px;margin-bottom:0">
-            <button class="btn-sm btn-primary" onclick="saveTonWallet()">Сохранить</button>
-          </div>
-          <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
-            <span style="font-size:13px;font-weight:700;min-width:200px">Бесплатный период (дней):</span>
-            <input class="inp" type="number" id="set-free-days" value="30" style="width:120px;margin-bottom:0">
-            <button class="btn-sm btn-primary" onclick="saveFreeDays()">Сохранить</button>
-          </div>
-        </div>
-      </div>
-
-      <div class="table-wrap" style="margin-top:16px">
-        <div class="table-hdr"><h3>Штрафные коэффициенты (снижение рейтинга)</h3></div>
-        <div style="padding:16px;display:flex;flex-direction:column;gap:12px">
-          <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
-            <span style="font-size:13px;font-weight:700;min-width:220px">Штраф пассажира за отмену:</span>
-            <input class="inp" type="number" step="0.01" min="0" max="5" id="set-pax-penalty" value="0.10" style="width:100px;margin-bottom:0">
-            <span style="font-size:12px;color:var(--text3)">баллов рейтинга</span>
-            <button class="btn-sm btn-primary" onclick="savePenaltySettings()">Сохранить</button>
-          </div>
-          <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
-            <span style="font-size:13px;font-weight:700;min-width:220px">Штраф водителя за отмену:</span>
-            <input class="inp" type="number" step="0.01" min="0" max="5" id="set-drv-penalty" value="0.05" style="width:100px;margin-bottom:0">
-            <span style="font-size:12px;color:var(--text3)">баллов рейтинга</span>
-          </div>
-          <div style="font-size:11px;color:var(--text3)">Рейтинг снижается при отмене после принятия заказа. Минимальный рейтинг — 1.0</div>
-        </div>
-      </div>
-
-      <div class="table-wrap" style="margin-top:16px">
-        <div class="table-hdr"><h3>Firebase Rules — скопируйте в консоль</h3></div>
-        <div style="padding:16px">
-          <div style="background:var(--bg3);border-radius:8px;padding:14px;font-family:monospace;font-size:12px;color:var(--text2);white-space:pre-wrap;overflow-x:auto">rules_version = '2';
-service cloud.firestore {
-  match /databases/{database}/documents {
-
-    match /users/{userId} {
-      allow read: if true;
-      allow write: if request.auth != null;
-    }
-
-    match /orders/{orderId} {
-      allow read: if true;
-      allow write: if request.auth != null;
-    }
-
-    match /driver_shifts/{shiftId} {
-      allow read: if true;
-      allow write: if request.auth != null;
-    }
-
-    match /ratings/{ratingId} {
-      allow read, write: if request.auth != null;
-    }
-
-    match /chats/{msgId} {
-      allow read, write: if request.auth != null;
-    }
-
-    match /settings/{doc} {
-      allow read: if true;
-      allow write: if request.auth != null;
-    }
-
-    match /phone_shares/{tgId} {
-      allow read: if request.auth != null;
-      allow write: if true;
-    }
-
-    match /{document=**} {
-      allow read, write: if request.auth != null
-        &amp;&amp; request.auth.token.admin == true;
-    }
-  }
-}</div>
-          <button class="btn-sm btn-view" style="margin-top:8px" onclick="copyRules()">📋 Скопировать Rules</button>
-        </div>
-      </div>
-    </div>
-
+  <div class="edit-prod-footer">
+    <button class="btn btn-out" onclick="closeEditProduct()" style="flex:0 0 auto;width:auto;padding:14px 20px">Отмена</button>
+    <button class="btn btn-red" onclick="saveEditProduct()">💾 Сохранить</button>
   </div>
 </div>
 
-<div class="toast" id="toast"></div>
+<!-- ================================================================
+     IMPORT MODAL
+     ================================================================ -->
+<div class="modal-overlay" id="import-modal" onclick="if(event.target===this)hideImportModal()">
+  <div class="modal-sheet">
+    <div class="modal-hdr">
+      <div class="modal-title">📥 Импорт товаров</div>
+      <button class="modal-close" onclick="hideImportModal()">✕</button>
+    </div>
 
+    <div class="field">
+      <label>Файл Excel (.xlsx)</label>
+      <div class="img-upload-area" style="height:70px;border-radius:var(--r2);cursor:pointer"
+        onclick="document.getElementById('import-file').click()">
+        <span style="font-size:22px">📊</span>
+        <span style="font-size:12px;color:var(--text2)" id="import-file-name">Выбрать файл</span>
+      </div>
+      <input type="file" id="import-file" accept=".xlsx,.xls"
+        onchange="document.getElementById('import-file-name').textContent=this.files[0]?.name||'Выбрать файл'">
+    </div>
+
+    <div class="field" style="margin-top:8px">
+      <label>Категория по умолчанию (для новых товаров)</label>
+      <select id="import-category" class="inp" style="margin:0">
+        <option value="other">Другое</option>
+      </select>
+    </div>
+
+    <div class="progress-wrap" id="import-progress">
+      <div class="progress-track"><div class="progress-fill" id="import-fill"></div></div>
+      <div class="progress-label" id="import-label">Импорт…</div>
+    </div>
+
+    <div style="font-size:12px;color:var(--text3);margin:12px 0;line-height:1.6">
+      Формат: колонка 1 — штрихкод, 2 — наименование, 4 — цена, 5 — клубная цена,
+      6 — акц. цена, 7 — нач. акции, 8 — кон. акции, 10 — остаток.<br>
+      При повторном импорте обновляются только цены и остатки. Категория существующих товаров не меняется.
+    </div>
+
+    <button class="btn btn-red" onclick="startImport()">Начать импорт</button>
+  </div>
+</div>
+
+<!-- ================================================================
+     SCRIPTS
+     ================================================================ -->
+<script src="js/config.js"></script>
+<script src="js/db.js"></script>
+<script src="js/utils.js"></script>
 <script src="js/admin.js"></script>
+
+<script>
+// Populate category chips and import select on load
+document.addEventListener('DOMContentLoaded', () => {
+  // Category filter chips for admin shop tab
+  const filterWrap = document.getElementById('admin-cat-filter');
+  SUPERMARKET_CATEGORIES.forEach(cat => {
+    const btn = document.createElement('button');
+    btn.className = 'admin-cat-chip filter-chip';
+    btn.dataset.cat = cat.id;
+    btn.textContent = cat.emoji + ' ' + cat.name;
+    btn.onclick = () => adminFilterCat(cat.id);
+    filterWrap.appendChild(btn);
+  });
+
+  // Category chips in edit product screen
+  const chipsWrap = document.getElementById('ep-category-chips');
+  SUPERMARKET_CATEGORIES.forEach(cat => {
+    const btn = document.createElement('button');
+    btn.className = 'cat-sel-chip';
+    btn.dataset.cat = cat.id;
+    btn.textContent = cat.emoji + ' ' + cat.name;
+    btn.onclick = () => selectEditCategory(cat.id);
+    chipsWrap.appendChild(btn);
+  });
+
+  // Import category select
+  const sel = document.getElementById('import-category');
+  SUPERMARKET_CATEGORIES.forEach(cat => {
+    const opt = document.createElement('option');
+    opt.value = cat.id;
+    opt.textContent = cat.emoji + ' ' + cat.name;
+    sel.appendChild(opt);
+  });
+});
+</script>
+
 </body>
 </html>
