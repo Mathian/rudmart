@@ -673,6 +673,7 @@ html, body { height:100%; overflow:hidden; background:var(--bg); color:var(--tex
 .mos-accepted { background:rgba(245,158,11,.12); color:#f59e0b; }
 .mos-collected{ background:rgba(249,115,22,.12); color:var(--orange); }
 .mos-sent     { background:rgba(34,197,94,.12);  color:var(--green); }
+.mos-delivered{ background:rgba(16,185,129,.15); color:#10b981; }
 .mos-cancelled{ background:rgba(239,68,68,.1);   color:var(--red-err); }
 .my-order-cancel {
   margin-top:10px; padding-top:10px; border-top:1px solid var(--border);

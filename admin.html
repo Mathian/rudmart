@@ -11,7 +11,7 @@
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-<link rel="stylesheet" href="css/admin.css">
+<link rel="stylesheet" href="css/admin.css?v=4">
 </head>
 <body>
 
@@ -56,6 +56,7 @@
       <button class="filter-chip"        data-filter="accepted"  onclick="setOrdersFilter('accepted')">Принятые</button>
       <button class="filter-chip"        data-filter="collected" onclick="setOrdersFilter('collected')">Собранные</button>
       <button class="filter-chip"        data-filter="sent"      onclick="setOrdersFilter('sent')">Отправленные</button>
+      <button class="filter-chip"        data-filter="delivered" onclick="setOrdersFilter('delivered')">Доставленные</button>
       <button class="filter-chip"        data-filter="cancelled" onclick="setOrdersFilter('cancelled')">Отменённые</button>
     </div>
 
@@ -368,9 +369,13 @@
           <input id="ep-carbs" type="number" step="0.1" placeholder="0">
         </div>
       </div>
-      <div class="cb-row">
-        <input type="checkbox" id="ep-carbonated">
-        <label for="ep-carbonated">Газированный</label>
+      <div class="field">
+        <label>Газированный</label>
+        <div class="radio-group">
+          <label class="radio-opt"><input type="radio" name="ep-carbonated" value="na"> Не применимо</label>
+          <label class="radio-opt"><input type="radio" name="ep-carbonated" value="no"> Нет</label>
+          <label class="radio-opt"><input type="radio" name="ep-carbonated" value="yes"> Да</label>
+        </div>
       </div>
     </div>
 
@@ -431,7 +436,7 @@
 <script src="js/config.js?v=2"></script>
 <script src="js/db.js?v=2"></script>
 <script src="js/utils.js?v=2"></script>
-<script src="js/admin.js?v=3"></script>
+<script src="js/admin.js?v=4"></script>
 
 <script>
 // Populate category chips and import select on load

@@ -133,6 +133,7 @@ const ORDER_STATUS_LABELS = {
   accepted:  'Принят',
   collected: 'Собран',
   sent:      'Отправлен',
+  delivered: 'Доставлено',
   cancelled: 'Отменён',
 };
 
@@ -171,7 +172,7 @@ function renderOrders() {
   }).join('');
 }
 
-function openOrderDetail(orderId) {
+async function openOrderDetail(orderId) {
   const order = ADMIN.allOrders.find(o => o.id === orderId);
   if (!order) return;
   ADMIN.currentOrder = order;
@@ -191,9 +192,19 @@ function openOrderDetail(orderId) {
   // Items (read-only — editing not allowed)
   const itemsEl = document.getElementById('od-items');
   if (itemsEl) {
-    itemsEl.innerHTML = (order.items || []).map(item => `
+    // Load full product data to show barcode for seller verification
+    const itemsData = await Promise.all((order.items || []).map(async item => {
+      const productId = item.code || item.barcode || '';
+      const prod = productId ? await dbGet('products', productId).catch(() => null) : null;
+      return { item, prod };
+    }));
+    itemsEl.innerHTML = itemsData.map(({ item, prod }) => `
       <div class="order-item-row">
-        <div class="order-item-name">${esc(item.name || item.barcode)}</div>
+        <div class="order-item-info">
+          <div class="order-item-name">${esc(item.name || item.code || item.barcode)}</div>
+          ${prod?.barcode ? `<div class="order-item-barcode">📦 Штрих-код: <b>${esc(prod.barcode)}</b></div>` : ''}
+          ${prod?.brand ? `<div class="order-item-barcode">Бренд: ${esc(prod.brand)}</div>` : ''}
+        </div>
         <div class="order-item-qty">× ${item.qty}</div>
         <div class="order-item-price">${fmtPrice((item.price||0) * item.qty)}</div>
       </div>`).join('');
@@ -228,6 +239,8 @@ function renderOrderActions(status) {
     btns.push(`<button class="btn btn-ghost btn-sm" onclick="updateOrderStatus('cancelled')">✕ Отменить</button>`);
   } else if (status === 'collected') {
     btns.push(`<button class="btn btn-green btn-sm" onclick="updateOrderStatus('sent')">🚚 Отправлен</button>`);
+  } else if (status === 'sent') {
+    btns.push(`<button class="btn btn-blue btn-sm" onclick="updateOrderStatus('delivered')">✅ Доставлено</button>`);
   } else if (status === 'cancelled') {
     btns.push(`<button class="btn btn-blue btn-sm" onclick="updateOrderStatus('new')">↩ Принять заново</button>`);
   }
@@ -352,8 +365,9 @@ async function openEditProduct(barcode) {
   setVal2('ep-fat100', p.fat100 ?? '');
   setVal2('ep-carbs', p.carbs ?? '');
 
-  const carbCb = document.getElementById('ep-carbonated');
-  if (carbCb) carbCb.checked = !!p.carbonated;
+  const carbVal = (p.carbonated === 'yes' || p.carbonated === true) ? 'yes'
+    : (p.carbonated === 'no') ? 'no' : 'na';
+  document.querySelectorAll('input[name="ep-carbonated"]').forEach(r => { r.checked = r.value === carbVal; });
   const offerCb = document.getElementById('ep-best-offer');
   if (offerCb) offerCb.checked = !!p.isBestOffer;
 
@@ -432,7 +446,7 @@ async function saveEditProduct() {
     protein:   document.getElementById('ep-protein')?.value || '',
     fat100:    document.getElementById('ep-fat100')?.value || '',
     carbs:     document.getElementById('ep-carbs')?.value || '',
-    carbonated:document.getElementById('ep-carbonated')?.checked || false,
+    carbonated: document.querySelector('input[name="ep-carbonated"]:checked')?.value || 'na',
     isBestOffer:document.getElementById('ep-best-offer')?.checked || false,
   };
   if (p.imageUrl) updated.imageUrl = p.imageUrl;
@@ -593,19 +607,21 @@ async function startImport() {
       const rows  = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
 
       const startRow = (typeof rows[0]?.[0] === 'string' && isNaN(Number(rows[0][0]))) ? 1 : 0;
-      const dataRows = rows.slice(startRow).filter(r => r[0]);
+      const dataRows = rows.slice(startRow).filter(r => r[2]);
 
       if (!dataRows.length) { showToast('Нет данных в файле', 'err'); return; }
 
       if (progress) progress.classList.add('show');
       setProgress(`Парсинг ${dataRows.length} строк…`, 0);
 
-      // 2. Parse all rows into map { barcode → rowData }
+      // 2. Parse all rows into map { code → rowData }
       const parsed = new Map();
       for (const row of dataRows) {
-        const barcode = String(row[0] || '').trim();
-        if (!barcode) continue;
-        parsed.set(barcode, {
+        const code    = String(row[2] || '').trim();  // col 3 — product code
+        const barcode = String(row[0] || '').trim();  // col 1 — barcode
+        if (!code) continue;
+        parsed.set(code, {
+          barcode,
           name:       String(row[1] || '').trim(),
           price:      parseFloat(row[3]) || 0,
           clubPrice:  parseFloat(row[4]) || 0,
@@ -618,7 +634,7 @@ async function startImport() {
       const barcodes = [...parsed.keys()];
 
       // 3. Batch-check existence: 30 IDs per query, 10 concurrent
-      setProgress(`Проверка ${barcodes.length} товаров в базе…`, 5);
+      setProgress(`Проверка ${barcodes.length} кодов товаров в базе…`, 5);
       const existingSet = new Set();
       const chunks = [];
       for (let i = 0; i < barcodes.length; i += 30) chunks.push(barcodes.slice(i, i + 30));
@@ -641,11 +657,12 @@ async function startImport() {
       const items = [];
       const now = new Date().toISOString();
 
-      for (const [barcode, r] of parsed) {
-        if (existingSet.has(barcode)) {
+      for (const [code, r] of parsed) {
+        if (existingSet.has(code)) {
           // Update only volatile fields — do NOT touch category/image/chars
-          items.push({ id: barcode, data: {
+          items.push({ id: code, data: {
             name: r.name, nameLower: r.name.toLowerCase(),
+            barcode: r.barcode,
             price: r.price, clubPrice: r.clubPrice,
             promoPrice: r.promoPrice, promoStart: r.promoStart, promoEnd: r.promoEnd,
             stock: r.stock,
@@ -653,14 +670,15 @@ async function startImport() {
           updated++;
         } else {
           // Create with full default data
-          items.push({ id: barcode, data: {
-            barcode, name: r.name, nameLower: r.name.toLowerCase(),
+          items.push({ id: code, data: {
+            code, barcode: r.barcode,
+            name: r.name, nameLower: r.name.toLowerCase(),
             price: r.price, clubPrice: r.clubPrice,
             promoPrice: r.promoPrice, promoStart: r.promoStart, promoEnd: r.promoEnd,
             stock: r.stock,
             category: defaultCat, imageUrl: '', emoji: '',
             brand:'', volume:'', mass:'', fat:'', alcohol:'',
-            protein:'', fat100:'', carbs:'', carbonated: false, isBestOffer: false,
+            protein:'', fat100:'', carbs:'', carbonated: 'na', isBestOffer: false,
             createdAt: now,
           }});
           created++;
@@ -691,11 +709,11 @@ async function exportProducts() {
   showLoading();
   try {
     const snap = await db.collection('products').get();
-    const rows = [['Штрихкод','Наименование','Категория','Цена','Клуб.цена','Акц.цена','Нач.акции','Кон.акции','Остаток']];
+    const rows = [['Штрихкод','Наименование','Код','Цена','Клуб.цена','Акц.цена','Нач.акции','Кон.акции','Категория','Остаток']];
     snap.docs.forEach(d => {
       const p = d.data();
-      rows.push([d.id, p.name||'', p.category||'', p.price||'', p.clubPrice||'',
-        p.promoPrice||'', p.promoStart||'', p.promoEnd||'', p.stock??'']);
+      rows.push([p.barcode||'', p.name||'', d.id, p.price||'', p.clubPrice||'',
+        p.promoPrice||'', p.promoStart||'', p.promoEnd||'', p.category||'', p.stock??'']);
     });
     const wb = XLSX.utils.book_new();
     const ws = XLSX.utils.aoa_to_sheet(rows);

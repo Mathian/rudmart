@@ -699,7 +699,8 @@ async function openProduct(id) {
   if (p.mass)        chars.push(['Масса', p.mass]);
   if (p.fat != null && p.fat !== '') chars.push(['Жирность', p.fat + '%']);
   if (p.alcohol != null && p.alcohol !== '') chars.push(['Крепость', p.alcohol + '%']);
-  if (p.carbonated != null) chars.push(['Газированный', p.carbonated ? 'Да' : 'Нет']);
+  if (p.carbonated === 'yes' || p.carbonated === true) chars.push(['Газированный', 'Да']);
+  else if (p.carbonated === 'no') chars.push(['Газированный', 'Нет']);
   if (p.protein != null && p.protein !== '') chars.push(['Белки (100г)', p.protein + ' г']);
   if (p.fat100 != null && p.fat100 !== '')   chars.push(['Жиры (100г)', p.fat100 + ' г']);
   if (p.carbs != null && p.carbs !== '')     chars.push(['Углеводы (100г)', p.carbs + ' г']);
@@ -909,7 +910,11 @@ async function addToCart(id, product) {
     product = await dbGet('products', id);
     if (!product) return;
   }
+  const stock = Number(product.stock) || 0;
   if (STATE.cart[id]) {
+    if (STATE.cart[id].qty >= stock) {
+      showToast('Достигнут максимум по остатку', 'err'); return;
+    }
     STATE.cart[id].qty += 1;
   } else {
     STATE.cart[id] = { product, qty: 1, checked: true };
@@ -924,6 +929,12 @@ async function addToCart(id, product) {
 
 async function changeQty(id, delta) {
   if (!STATE.cart[id]) return;
+  if (delta > 0) {
+    const stock = Number(STATE.cart[id].product?.stock) || 0;
+    if (STATE.cart[id].qty >= stock) {
+      showToast('Достигнут максимум по остатку', 'err'); return;
+    }
+  }
   STATE.cart[id].qty += delta;
   if (STATE.cart[id].qty <= 0) {
     delete STATE.cart[id];
@@ -1242,7 +1253,7 @@ async function confirmOrder() {
   const items = checkedItems.map(([id, item]) => {
     const p = item.product || {};
     return {
-      barcode: id,
+      code: id,
       name: p.name || id,
       qty: item.qty,
       price: getPrice(p, STATE.clubCard),
@@ -1318,6 +1329,7 @@ const ORDER_STATUS_LABELS_BUYER = {
   accepted:  '✓ Принят',
   collected: '📦 Собирается',
   sent:      '🚚 В доставке',
+  delivered: '✅ Доставлено',
   cancelled: '✕ Отменён',
 };
 
